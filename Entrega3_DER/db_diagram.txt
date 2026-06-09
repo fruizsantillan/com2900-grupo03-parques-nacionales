@@ -1,0 +1,193 @@
+// ============================================================
+// dbdiagram.io - Sistema de Gestión de Parques Nacionales
+// Versión 3 - Normalización 3FN y Ajustes de Tipos de Dato
+// ============================================================
+// RESUMEN DE CAMBIOS V3:
+// 1. Tipos de dato monetarios: Se reemplazaron todos los float/double por 
+//    decimal(18,2) para evitar problemas de redondeo aproximado en SQL Server.
+// 2. Coordenadas GPS: Para latitud y longitud se aplicó decimal(9,6). Es el 
+//    estándar máximo necesario (usado por Google Maps) permitiendo precisión de 11cm.
+// 3. Superficies: Se reemplazó double por decimal(18,2) para áreas exactas.
+// 4. Normalización Tour: Se eliminó el campo 'guiaAsignado' de la tabla Tour, ya 
+//    que la relación dinámica/histórica se maneja correctamente en 'AsignacionGuia'.
+// 5. Facturación: Se agregó la FK 'idPrecioEntrada' en 'LineaVenta' para poder 
+//    identificar qué entrada exacta del catálogo se cobró, manteniendo el precio
+//    histórico congelado en el campo 'precioUnitario'.
+// ============================================================
+
+table Parque{
+  idParque int [PK, increment]
+  nombre varchar(100) [not null, unique]
+  superficie decimal(18,2) [not null] // V3: Cambiado a decimal para mayor precisión
+  idTipoParque int [not null, ref: > TipoParque.idTipoParque]
+  idUbicacion int [not null, ref: > Ubicacion.idUbicacion]
+}
+
+table TipoParque{
+  idTipoParque int [PK, increment]
+  descripcion varchar(100) [not null, unique]
+}
+
+table Ubicacion{
+  idUbicacion int [PK, increment]
+  direccion varchar(100) [not null]
+  provincia varchar(50) [not null]
+  latitud decimal(9,6) [not null] // V3: Precisión de 6 decimales para GPS
+  longitud decimal(9,6) [not null] // V3: Precisión de 6 decimales para GPS
+}
+
+// CAMBIOS en PrecioEntrada:
+// + idParque: los precios pueden actualizarse de forma independiente por parque.
+// + idTipoVisitante: el precio varía por tipo de visitante (residente, extranjero, jubilado, etc.).
+// Esto permite llevar un historial de precios en el tiempo (catálogo).
+table PrecioEntrada{
+  idPrecio int [PK, increment]
+  fechaActualizacion date [not null]
+  valor decimal(18,2) [not null] // V3: Cambiado a decimal(18,2)
+  idParque int [not null, ref: > Parque.idParque]
+  idTipoVisitante int [not null, ref: > TipoVisitante.idTipoVisitante]
+  fechaHasta date // Permite saber si el precio está vigente o caducó
+}
+
+// CAMBIOS en TipoVisitante:
+// + descripcion: Define la categoría (residente, extranjero, estudiante, etc.)
+table TipoVisitante{
+  idTipoVisitante int [PK, increment]
+  descripcion varchar(100) [not null, unique]
+}
+
+// CAMBIOS en Atraccion:
+// + idParque: cada atracción pertenece a un parque.
+// + duracion y cupoMaximo: requeridos por el TP.
+table Atraccion{
+  idAtraccion int [PK, increment]
+  nombre varchar(100) [not null] // Nombre separado de descripción
+  descripcion varchar(255)
+  tipo varchar(50)
+  precio decimal(18,2) [not null, default: 0] // V3: Decimal. 0 = atracciones gratuitas
+  duracion int [not null] // en minutos
+  cupoMaximo int [not null]
+  idParque int [not null, ref: > Parque.idParque]
+}
+
+// CAMBIOS en Tour:
+// + idParque: cada tour pertenece a un parque.
+// + duracion y cupoMaximo: requeridos por el TP.
+// V3: Se eliminó 'guiaAsignado'. Se maneja en la tabla puente AsignacionGuia.
+table Tour{
+  idTour int [PK, increment]
+  nombre varchar(100) [not null]
+  descripcion varchar(255)
+  duracion int [not null] // en minutos
+  cupoMaximo int [not null]
+  precio decimal(18,2) [not null, default: 0] // V3: Decimal
+  idParque int [not null, ref: > Parque.idParque]
+}
+
+// CAMBIOS en Guia:
+// + especialidad, titulo, vigenciaAutorizacion y habilitaciones: requeridos por el TP.
+table Guia{
+  dni int [PK, not null]
+  apyn varchar(100) [not null]
+  especialidad varchar(100)
+  titulo varchar(100)
+  habilitaciones varchar(255) // Puede normalizarse en el futuro
+  vigenciaAutorizacion date [not null]
+}
+
+// CAMBIOS en TicketVenta: (Representa la cabecera del recibo)
+// + puntoDeVenta, nroTicket y formaPago: requeridos por el TP (ticket factura).
+table TicketVenta{
+  idTicket int [PK, not null]
+  fechaHora datetime [not null]
+  total decimal(18,2) [not null] // V3: Decimal
+  puntoDeVenta int [not null]
+  nroTicket int [not null]
+  formaPago varchar(50) [not null] // efectivo, tarjeta, transferencia, etc.
+  idParque int [ref: > Parque.idParque]
+}
+
+// Representa el detalle/renglones del recibo
+table LineaVenta{
+  idLineaVenta int [PK, not null]
+  idPrecioEntrada int [ref: > PrecioEntrada.idPrecio] // V3: FK agregada para enlazar con el catálogo
+  descripcion varchar(50) [not null]
+  subtotal decimal(18,2) [not null] // V3: Decimal
+  cantidad int [not null]
+  precioUnitario decimal(18,2) [not null] // Congela el precio histórico al momento de la venta
+  ticketAsociado int [not null, ref: > TicketVenta.idTicket]
+  
+  // Dependiendo qué se venda, solo uno de los FK (Atraccion o Tour) tendrá datos, el resto NULL
+  idTour int [ref: > Tour.idTour]
+  idAtraccion int [ref: > Atraccion.idAtraccion]
+}
+
+// CAMBIOS en Concesion:
+// + idEmpresa, fechaInicio, fechaFin y canonMensual: requeridos por el TP.
+table Concesion{
+  idConcesion int [PK, increment]
+  descripcion varchar(100) [not null]
+  tipo int [not null, ref: > TipoDeConsesion.idTipoConcesion]
+  parque int [not null, ref: > Parque.idParque]
+  idEmpresa int [not null, ref: > Empresa.idEmpresa]
+  fechaInicio date [not null]
+  fechaFin date [not null]
+  canonMensual decimal(18,2) [not null] // V3: Decimal
+}
+
+// NUEVA TABLA: Empresa concesionaria
+// El TP pide registrar la empresa concesionaria con sus datos
+table Empresa{
+  idEmpresa int [PK, increment]
+  razonSocial varchar(200) [not null]
+  cuit varchar(20) [not null, unique]
+  contacto varchar(100)
+  email varchar(100)
+  telefono varchar(50)
+}
+
+table TipoDeConsesion{
+  idTipoConcesion int [PK, increment]
+  descripcion varchar(100) [not null]
+}
+
+// CAMBIOS en PagoConcesion:
+// + fechaPago y periodos: imprescindibles para detectar deudores (Reporte 3 de Entrega 7)
+table PagoConcesion{
+  idPagoConcesion int [PK, increment]
+  monto decimal(18,2) [not null] // V3: Decimal
+  fechaPago date [not null]
+  periodoAnio int [not null]
+  periodoMes int [not null]
+  concesion int [not null, ref: > Concesion.idConcesion]
+}
+
+table Guardaparque{
+  dni int [PK, not null]
+  apyn varchar(50) [not null]
+  email varchar(100)
+  telefono varchar(50)
+  localidad varchar(50)
+  fechaNacimiento datetime
+}
+
+// CAMBIOS en AsignacionGuardaparque:
+// - fechaFin es nullable (NULL indica asignación actualmente vigente, como pide el TP).
+// + motivoEgreso: requerido por el TP.
+table AsignacionGuardaparque{
+  idAsignacion int [PK, increment]
+  fechaInicio date [not null]
+  fechaFin date // NULL = asignación vigente
+  motivoEgreso varchar(255) // NULL si no hay egreso
+  parque int [not null, ref: > Parque.idParque]
+  guardaparque int [not null, ref: > Guardaparque.dni]
+}
+
+// V3: Tabla puente para mantener el histórico de qué guía dio qué tour
+table AsignacionGuia{
+  idAsignacion int [PK, increment]
+  idTour int [not null, ref: > Tour.idTour]
+  dniGuia int [not null, ref: > Guia.dni]
+  fechaInicio date [not null]
+  fechaFin date [not null]
+}
