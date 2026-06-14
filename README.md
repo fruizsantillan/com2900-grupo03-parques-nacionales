@@ -126,9 +126,9 @@ Todos los scripts deben comenzar con el siguiente comentario:
 
 | Módulo | Responsable | Tablas principales |
 |---|---|---|
-| Base + Parques + Personal | Del Vecchio, Fabrizio | `Parque`, `TipoParque`, `Ubicacion`, `Guardaparque`, `AsignacionGuardaparque` |
-| Guías + Tours + Atracciones | Ocampos, Horacio | `Guia`, `AsignacionGuia`, `Tour`, `Atraccion` |
-| Ventas + Precios | Ruiz Santillán, Facundo | `TicketVenta`, `LineaVenta`, `PrecioEntrada`, `TipoVisitante` |
-| Concesiones + Empresas | Lago, Franco Nehuen | `Concesion`, `TipoDeConsesion`, `Empresa`, `PagoConcesion` |
+| Base + Parques + Personal | Lago, Franco Nehuen | `Parque`, `TipoParque`, `Ubicacion`, `Guardaparque`, `AsignacionGuardaparque` |
+| Guías + Tours + Atracciones | Del Vecchio, Fabrizio | `Guia`, `AsignacionGuia`, `Tour`, `Atraccion` |
+| Ventas + Precios | Ocampos, Horacio | `TicketVenta`, `LineaVenta`, `PrecioEntrada`, `TipoVisitante` |
+| Concesiones + Empresas | Ruiz Santillán, Facundo | `Concesion`, `TipoDeConsesion`, `Empresa`, `PagoConcesion` |
 
 ---
