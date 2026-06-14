@@ -31,13 +31,13 @@ Motor de base de datos: **Microsoft SQL Server 2022**
 
 ```
 📁 Entregas/
-    📁 E3_DER/
-    📁 E4_Instalacion/
-    📁 E5_BaseDeDatos/
-    📁 E6_Importacion/
-    📁 E7_Reportes/
-    📁 E8_SeguridadRespaldo/
-    📁 E9_Final/
+    📁 Entrega3_DER/
+    📁 Entrega4_Instalacion/
+    📁 Entrega5_BaseDeDatos/
+    📁 Entrega6_Importacion/
+    📁 Entrega7_Reportes/
+    📁 Entrega8_SeguridadRespaldo/
+    📁 Entrega9_Final/
 
 📁 Scripts/
     📄 01_CreacionDB.sql           -- Creación de la base de datos y esquemas
@@ -58,8 +58,7 @@ Motor de base de datos: **Microsoft SQL Server 2022**
 
 📁 Documentacion/
     📄 NormasNomenclatura.md       -- Norma de nomenclatura del grupo
-    📄 DER_v1.png                  -- Diagrama Entidad-Relación versión 1
-    📄 DER_v2.png                  -- Diagrama Entidad-Relación versión 2 (con cambios)
+    📄 DER.png                  -- Diagrama Entidad-Relación
 
 📄 README.md
 ```
