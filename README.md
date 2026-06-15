@@ -15,7 +15,7 @@
 | Del Vecchio, Fabrizio | fabrid022-cmyk |
 | Ocampos, Horacio | — |
 | Ruiz Santillán, Facundo | fruizsantillan |
-| Lago, Franco Nehuen | — |
+| Lago, Franco Nehuen | LagooFran |
 
 ---
 
