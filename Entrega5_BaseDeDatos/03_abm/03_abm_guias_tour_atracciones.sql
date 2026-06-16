@@ -14,7 +14,7 @@ CREATE OR ALTER PROCEDURE parques.sp_Guia_Insertar
     @especialidad           VARCHAR(100) = NULL,
     @titulo                 VARCHAR(100) = NULL,
     @habilitaciones         VARCHAR(255) = NULL,
-    @vigenciaAutorizacion   DATE NOT NULL
+    @vigenciaAutorizacion   DATE
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -49,7 +49,7 @@ CREATE OR ALTER PROCEDURE parques.sp_Guia_Actualizar
     @especialidad           VARCHAR(100) = NULL,
     @titulo                 VARCHAR(100) = NULL,
     @habilitaciones         VARCHAR(255) = NULL,
-    @vigenciaAutorizacion   DATE NOT NULL
+    @vigenciaAutorizacion   DATE
 AS
 BEGIN
     SET NOCOUNT ON;
