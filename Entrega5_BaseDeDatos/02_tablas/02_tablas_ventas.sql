@@ -15,6 +15,10 @@
 USE ParquesNacionales;
 GO
 
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'ventas')
+    EXEC('CREATE SCHEMA ventas');
+GO
+
 -- ============================================================
 -- TABLA: TipoVisitante
 -- Lookup de tipos de visitante

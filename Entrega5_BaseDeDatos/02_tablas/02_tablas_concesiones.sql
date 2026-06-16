@@ -13,6 +13,10 @@
 USE ParquesNacionales;
 GO
 
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'concesiones')
+    EXEC('CREATE SCHEMA concesiones');
+GO
+
 -- ============================================================
 -- TABLA: TipoDeConsesion
 -- Lookup de tipos de actividad concesionada
