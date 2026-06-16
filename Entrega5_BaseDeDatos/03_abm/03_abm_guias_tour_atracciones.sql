@@ -87,7 +87,7 @@ BEGIN
 
     IF NOT EXISTS (SELECT 1 FROM parques.Guia WHERE dni = @dni)
         SET @vErrores = @vErrores + '- No existe un guía con ese DNI.' + CHAR(13);
-    IF EXISTS (SELECT 1 FROM parques.AsignacionGuia WHERE dni = @dni)
+    IF EXISTS (SELECT 1 FROM parques.AsignacionGuia WHERE dniGuia = @dni)
         SET @vErrores = @vErrores + '- El guía tiene tours asignados y no puede eliminarse.' + CHAR(13);
 
     IF @vErrores != ''
