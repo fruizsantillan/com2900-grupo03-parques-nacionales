@@ -13,7 +13,7 @@
 -- Notas: Ninguna operacion accede directamente a las tablas.
 --        Cada SP reune todos los errores en un unico mensaje.
 --        Los Eliminar validan dependencias en los esquemas parques,
---        ventas y concesiones antes de borrar.
+--        ventas (modulo en construccion) y concesiones antes de borrar.
 -- =============================================
 
 USE ParquesNacionales;
@@ -364,6 +364,7 @@ GO
 --   parques.Tour, parques.Atraccion, parques.AsignacionGuardaparque
 --   ventas.PrecioEntrada, ventas.TicketVenta  (esquema ventas, modulo en construccion)
 --   concesiones.Concesion
+    
 CREATE OR ALTER PROCEDURE parques.sp_Parque_Eliminar
     @idParque INT
 AS
@@ -429,7 +430,7 @@ GO
 -- GUARDAPARQUE - INSERTAR
 -- ==================
 CREATE OR ALTER PROCEDURE parques.sp_Guardaparque_Insertar
-    @dni             VARCHAR(50),
+    @dni             INT,
     @apyn            VARCHAR(50),
     @email           VARCHAR(100) = NULL,
     @telefono        VARCHAR(50)  = NULL,
@@ -440,10 +441,10 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF @dni IS NULL OR LTRIM(RTRIM(@dni)) = ''
-        SET @vErrores += '- El DNI es obligatorio.' + CHAR(13);
+    IF @dni IS NULL OR @dni <= 0
+        SET @vErrores += '- El DNI es obligatorio y debe ser mayor a 0.' + CHAR(13);
     ELSE IF EXISTS (SELECT 1 FROM parques.Guardaparque
-                    WHERE dni = LTRIM(RTRIM(@dni)))
+                    WHERE dni = @dni)
         SET @vErrores += '- Ya existe un guardaparque registrado con ese DNI.' + CHAR(13);
 
     IF @apyn IS NULL OR LTRIM(RTRIM(@apyn)) = ''
@@ -462,9 +463,9 @@ BEGIN
     END
 
     INSERT INTO parques.Guardaparque (dni, apyn, email, telefono, localidad, fechaNacimiento)
-    VALUES (LTRIM(RTRIM(@dni)), LTRIM(RTRIM(@apyn)), @email, @telefono, @localidad, @fechaNacimiento);
+    VALUES (@dni, LTRIM(RTRIM(@apyn)), @email, @telefono, @localidad, @fechaNacimiento);
 
-    PRINT 'Guardaparque registrado con DNI: ' + LTRIM(RTRIM(@dni));
+    PRINT 'Guardaparque registrado con DNI: ' + CAST(@dni AS VARCHAR);
 END
 GO
 
@@ -472,7 +473,7 @@ GO
 -- GUARDAPARQUE - ACTUALIZAR
 -- ==================
 CREATE OR ALTER PROCEDURE parques.sp_Guardaparque_Actualizar
-    @dni             VARCHAR(50),
+    @dni             INT,
     @apyn            VARCHAR(50),
     @email           VARCHAR(100) = NULL,
     @telefono        VARCHAR(50)  = NULL,
@@ -518,7 +519,7 @@ GO
 -- GUARDAPARQUE - ELIMINAR
 -- ==================
 CREATE OR ALTER PROCEDURE parques.sp_Guardaparque_Eliminar
-    @dni VARCHAR(50)
+    @dni INT
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -547,7 +548,7 @@ GO
 -- GUARDAPARQUE - OBTENER POR ID
 -- ==================
 CREATE OR ALTER PROCEDURE parques.sp_Guardaparque_ObtenerPorId
-    @dni VARCHAR(50)
+    @dni INT
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -564,7 +565,7 @@ GO
 CREATE OR ALTER PROCEDURE parques.sp_AsignacionGuardaparque_Insertar
     @fechaInicio  DATE,
     @idParque     INT,
-    @dni          VARCHAR(50),
+    @dni          INT,
     @fechaFin     DATE         = NULL,
     @motivoEgreso VARCHAR(255) = NULL
 AS
@@ -615,7 +616,7 @@ CREATE OR ALTER PROCEDURE parques.sp_AsignacionGuardaparque_Actualizar
     @idAsignacion INT,
     @fechaInicio  DATE,
     @idParque     INT,
-    @dni          VARCHAR(50),
+    @dni          INT,
     @fechaFin     DATE         = NULL,
     @motivoEgreso VARCHAR(255) = NULL
 AS
