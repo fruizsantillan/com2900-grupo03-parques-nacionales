@@ -124,11 +124,12 @@ table LineaVenta{
 
 // CAMBIOS en Concesion:
 // + idEmpresa, fechaInicio, fechaFin y canonMensual: requeridos por el TP.
+// V4: Columnas FK renombradas a convencion id+NombreTabla (idTipoConcesion, idParque)
 table Concesion{
   idConcesion int [PK, increment]
   descripcion varchar(100) [not null]
-  tipo int [not null, ref: > TipoDeConsesion.idTipoConcesion]
-  parque int [not null, ref: > Parque.idParque]
+  idTipoConcesion int [not null, ref: > TipoDeConsesion.idTipoConcesion]
+  idParque int [not null, ref: > Parque.idParque]
   idEmpresa int [not null, ref: > Empresa.idEmpresa]
   fechaInicio date [not null]
   fechaFin date [not null]
@@ -153,13 +154,14 @@ table TipoDeConsesion{
 
 // CAMBIOS en PagoConcesion:
 // + fechaPago y periodos: imprescindibles para detectar deudores (Reporte 3 de Entrega 7)
+// V4: Columna FK renombrada a convencion id+NombreTabla (idConcesion)
 table PagoConcesion{
   idPagoConcesion int [PK, increment]
+  idConcesion int [not null, ref: > Concesion.idConcesion]
   monto decimal(18,2) [not null] // V3: Decimal
   fechaPago date [not null]
   periodoAnio int [not null]
   periodoMes int [not null]
-  concesion int [not null, ref: > Concesion.idConcesion]
 }
 
 table Guardaparque{
