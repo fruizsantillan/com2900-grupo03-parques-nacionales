@@ -10,10 +10,6 @@
 --                   Parque                 (Insertar/Actualizar/Eliminar/ObtenerPorId)
 --                   Guardaparque           (Insertar/Actualizar/Eliminar/ObtenerPorId)
 --                   AsignacionGuardaparque (Insertar/Actualizar/Eliminar/ObtenerPorId)
--- Notas: Ninguna operacion accede directamente a las tablas.
---        Cada SP reune todos los errores en un unico mensaje.
---        Los Eliminar validan dependencias en los esquemas parques,
---        ventas (modulo en construccion) y concesiones antes de borrar.
 -- =============================================
 
 USE ParquesNacionales;
