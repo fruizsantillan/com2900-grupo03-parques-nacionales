@@ -883,7 +883,7 @@ PRINT '--- TEST 1: Insertar guía válido ---';
 -- Resultado esperado: 1 fila insertada, sin error
 EXEC parques.sp_Guia_Insertar
     @dni = 30000001,
-    @apynom = 'Carlos Pérez',
+    @apyn = 'Carlos Pérez',
     @especialidad = 'Flora patagónica',
     @titulo = 'Lic. en Biología',
     @vigenciaAutorizacion = '2027-12-31';
@@ -923,7 +923,7 @@ PRINT '--- TEST 4: Insertar guía con DNI duplicado ---';
 BEGIN TRY
     EXEC parques.sp_Guia_Insertar
         @dni = 30000001,
-        @apynom = 'Otro Guia',
+        @apyn = 'Otro Guia',
         @vigenciaAutorizacion = '2026-01-01';
 END TRY
 BEGIN CATCH
