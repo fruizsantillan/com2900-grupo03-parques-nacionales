@@ -13,7 +13,7 @@ PRINT '--- TEST 1: Insertar guía válido ---';
 -- Resultado esperado: 1 fila insertada, sin error
 EXEC parques.sp_Guia_Insertar
     @dni = 30000001,
-    @apynom = 'Carlos Pérez',
+    @apyn = 'Carlos Pérez',
     @especialidad = 'Flora patagónica',
     @titulo = 'Lic. en Biología',
     @vigenciaAutorizacion = '2027-12-31';
