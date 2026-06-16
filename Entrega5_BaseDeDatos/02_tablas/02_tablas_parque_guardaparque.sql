@@ -17,22 +17,7 @@ GO
 --- Creacion del esquema parques
 IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'parques')
     EXEC('CREATE SCHEMA parques');
-
--- ============================================================
--- TABLA: Parque
--- Parques registrados
--- ============================================================
-
-CREATE TABLE parques.Parque (
-    idParque       INT            IDENTITY(1,1) NOT NULL,
-    nombre         VARCHAR(100)   NOT NULL,
-    superficie     DECIMAL(18,2)  NOT NULL,
-    idTipoParque   INT            NOT NULL,
-    idUbicacion    INT            NOT NULL,
-    CONSTRAINT PK_Parque PRIMARY KEY (idParque),
-    CONSTRAINT FK_Parque_TipoParque FOREIGN KEY (idTipoParque) REFERENCES parques.TipoParque (idTipoParque),
-    CONSTRAINT FK_Parque_Ubicacion FOREIGN KEY (idUbicacion) REFERENCES parques.Ubicacion (idUbicacion)
-);
+GO
 
 -- ============================================================
 -- TABLA: TipoParque
@@ -58,6 +43,22 @@ CREATE TABLE parques.Ubicacion (
     latitud      DECIMAL(9,6)   NOT NULL,
     longitud     DECIMAL(9,6)   NOT NULL,
     CONSTRAINT PK_Ubicacion PRIMARY KEY (idUbicacion)
+);
+
+-- ============================================================
+-- TABLA: Parque
+-- Parques registrados
+-- ============================================================
+
+CREATE TABLE parques.Parque (
+    idParque       INT            IDENTITY(1,1) NOT NULL,
+    nombre         VARCHAR(100)   NOT NULL,
+    superficie     DECIMAL(18,2)  NOT NULL,
+    idTipoParque   INT            NOT NULL,
+    idUbicacion    INT            NOT NULL,
+    CONSTRAINT PK_Parque PRIMARY KEY (idParque),
+    CONSTRAINT FK_Parque_TipoParque FOREIGN KEY (idTipoParque) REFERENCES parques.TipoParque (idTipoParque),
+    CONSTRAINT FK_Parque_Ubicacion FOREIGN KEY (idUbicacion) REFERENCES parques.Ubicacion (idUbicacion)
 );
 
 -- ============================================================

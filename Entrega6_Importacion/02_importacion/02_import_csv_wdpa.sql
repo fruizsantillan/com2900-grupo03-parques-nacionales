@@ -123,14 +123,15 @@ BEGIN
     BEGIN TRY
         MERGE parques.Parque AS destino
         USING (
+            -- Deduplicar por nombre: el WDPA puede tener Polygon + Point del mismo area.
+            -- Se toma el registro con mayor superficie (MAX gisArea).
             SELECT
-                LTRIM(RTRIM(name))  AS nombre,
-                -- GIS_AREA en km2 -> hectareas
-                TRY_CAST(
-                    REPLACE(LTRIM(RTRIM(gisArea)), ',', '.')
+                LTRIM(RTRIM(s.name))  AS nombre,
+                MAX(TRY_CAST(
+                    REPLACE(LTRIM(RTRIM(s.gisArea)), ',', '.')
                     AS DECIMAL(18,2)
-                ) * 100             AS superficieHa,
-                tp.idTipoParque,
+                )) * 100              AS superficieHa,
+                MAX(tp.idTipoParque)  AS idTipoParque,
                 @vIdUbicacionGenerica AS idUbicacion
             FROM staging.AreasWDPA s
             JOIN parques.TipoParque tp
@@ -142,6 +143,7 @@ BEGIN
                     REPLACE(LTRIM(RTRIM(s.gisArea)), ',', '.')
                     AS DECIMAL(18,2)
                   ) IS NOT NULL
+            GROUP BY LTRIM(RTRIM(s.name))
         ) AS origen
         ON destino.nombre = origen.nombre
 
