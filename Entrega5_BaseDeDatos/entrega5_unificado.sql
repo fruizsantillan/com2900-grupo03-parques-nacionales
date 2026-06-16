@@ -179,10 +179,7 @@ GO
 -- TABLAS - Módulo Guías, Tours y Atracciones
 -- ============================================================
 
--- Universidad: Universidad Nacional de La Matanza
--- Comisión: 01-2900 | Grupo 03
 --              Ruiz Santillán Facundo, Lago Franco Nehuen
--- Descripción: Creación de tablas del módulo Guías, Tours y Atracciones
 
 GO
 
@@ -1481,7 +1478,6 @@ GO
 -- ABM - Guías, Tours y Atracciones
 -- ============================================================
 
--- Descripción: SPs ABM del módulo Guías, Tours y Atracciones
 
 GO
 
@@ -2739,8 +2735,10 @@ GO
 -- NEGOCIO - Concesiones
 -- ============================================================
 
+--   SP 1: sp_AltaConcesionCompleta
 --         Registra una nueva concesion validando integridad entre
 --         empresa, parque, tipo y solapamiento de vigencias.
+--   SP 2: sp_RegistrarPagoCanon
 --         Registra el pago mensual del canon validando que la
 --         concesion este vigente y que no exista pago duplicado
 --         para el mismo periodo.
@@ -2940,10 +2938,10 @@ GO
 -- NEGOCIO - Guías, Tours y Atracciones
 -- ============================================================
 
--- Descripción: SPs de lógica de negocio - Guías, Tours y Atracciones
 
 GO
 
+-- SP NEGOCIO: Asignar guía a tour
 -- Valida: vigencia, superposición de fechas
 CREATE OR ALTER PROCEDURE parques.sp_AsignarGuiaATour
     @idTour      INT,
@@ -3002,6 +3000,7 @@ BEGIN
 END
 GO
 
+-- SP NEGOCIO: Registrar atracción en un parque
 CREATE OR ALTER PROCEDURE parques.sp_RegistrarAtraccion
     @nombre         VARCHAR(100),
     @descripcion    VARCHAR(255) = NULL,
@@ -3053,9 +3052,11 @@ GO
 -- NEGOCIO - Ventas
 -- ============================================================
 
+--   SP 1: sp_RegistrarVentaEntrada
 --         Registra una venta de entrada validando parque, tipo de visitante,
 --         precio existente, ticket y linea de venta. Si el ticket no existe,
 --         lo crea. Si existe, agrega la linea y recalcula el total.
+--   SP 2: sp_ActualizarPrecioEntrada
 --         Actualiza el precio de entrada para un parque y tipo de visitante,
 --         modificando el valor y la fecha de actualizacion.
 
@@ -4122,7 +4123,6 @@ GO
 -- TESTING - Guías, Tours y Atracciones
 -- ============================================================
 
--- Descripción: Testing del módulo Guías, Tours y Atracciones
 
 GO
 
