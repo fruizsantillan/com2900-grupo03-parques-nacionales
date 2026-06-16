@@ -66,7 +66,7 @@ CREATE TABLE parques.Ubicacion (
 -- ============================================================
 
 CREATE TABLE parques.Guardaparque (
-    dni              VARCHAR(50)    NOT NULL,
+    dni              INT    NOT NULL,
     apyn             VARCHAR(50)    NOT NULL,
     email            VARCHAR(100)   NULL,
     telefono         VARCHAR(50)    NULL,
@@ -86,7 +86,7 @@ CREATE TABLE parques.AsignacionGuardaparque (
     fechaFin       DATE           NULL,
     motivoEgreso   VARCHAR(255)   NULL,
     idParque       INT            NOT NULL,
-    dni            VARCHAR(50)    NOT NULL,
+    dni            INT    NOT NULL,
     CONSTRAINT PK_AsignacionGuardaparque PRIMARY KEY (idAsignacion),
     CONSTRAINT FK_AsignacionGuardaparque_Parque FOREIGN KEY (idParque) REFERENCES parques.Parque (idParque),
     CONSTRAINT FK_AsignacionGuardaparque_Guardaparque FOREIGN KEY (dni) REFERENCES parques.Guardaparque (dni)
