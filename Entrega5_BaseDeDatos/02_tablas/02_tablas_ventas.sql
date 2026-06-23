@@ -15,21 +15,26 @@
 USE ParquesNacionales;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'ventas')
-    EXEC('CREATE SCHEMA ventas');
-GO
-
 -- ============================================================
 -- TABLA: TipoVisitante
 -- Lookup de tipos de visitante
 -- Ejemplos: Residente, Extranjero, Jubilado, Estudiante
 -- ============================================================
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.tables t
+    JOIN sys.schemas s ON s.schema_id = t.schema_id
+    WHERE t.name = 'TipoVisitante'
+      AND s.name = 'ventas'
+)
+BEGIN
 CREATE TABLE ventas.TipoVisitante (
     idTipoVisitante  INT          IDENTITY(1,1)  NOT NULL,
     descripcion      VARCHAR(100)                NOT NULL,
     CONSTRAINT PK_TipoVisitante             PRIMARY KEY (idTipoVisitante),
     CONSTRAINT UQ_TipoVisitante_descripcion UNIQUE      (descripcion)
 );
+END
 GO
 
 -- ============================================================
@@ -37,6 +42,14 @@ GO
 -- Catalogo historico de precios de entrada por parque y tipo de visitante
 -- fechaHasta NULL indica precio vigente
 -- ============================================================
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.tables t
+    JOIN sys.schemas s ON s.schema_id = t.schema_id
+    WHERE t.name = 'PrecioEntrada'
+      AND s.name = 'ventas'
+)
+BEGIN
 CREATE TABLE ventas.PrecioEntrada (
     idPrecio           INT           IDENTITY(1,1)  NOT NULL,
     fechaActualizacion DATE                         NOT NULL,
@@ -49,12 +62,21 @@ CREATE TABLE ventas.PrecioEntrada (
     CONSTRAINT FK_PrecioEntrada_TipoVisitante FOREIGN KEY (idTipoVisitante) REFERENCES ventas.TipoVisitante(idTipoVisitante),
     CONSTRAINT CHK_PrecioEntrada_valor        CHECK (valor >= 0)
 );
+END
 GO
 
 -- ============================================================
 -- TABLA: TicketVenta
 -- Cabecera del ticket de venta
 -- ============================================================
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.tables t
+    JOIN sys.schemas s ON s.schema_id = t.schema_id
+    WHERE t.name = 'TicketVenta'
+      AND s.name = 'ventas'
+)
+BEGIN
 CREATE TABLE ventas.TicketVenta (
     idTicket      INT IDENTITY(1,1) NOT NULL,
     fechaHora     DATETIME      NOT NULL,
@@ -67,6 +89,7 @@ CREATE TABLE ventas.TicketVenta (
     CONSTRAINT FK_TicketVenta_Parque FOREIGN KEY (idParque) REFERENCES parques.Parque(idParque),
     CONSTRAINT CHK_TicketVenta_total CHECK (total >= 0)
 );
+END
 GO
 
 -- ============================================================
@@ -74,6 +97,14 @@ GO
 -- Detalle o renglon del ticket de venta
 -- Puede representar una entrada, un tour o una atraccion
 -- ============================================================
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.tables t
+    JOIN sys.schemas s ON s.schema_id = t.schema_id
+    WHERE t.name = 'LineaVenta'
+      AND s.name = 'ventas'
+)
+BEGIN
 CREATE TABLE ventas.LineaVenta (
     idLineaVenta    INT IDENTITY(1,1) NOT NULL,
     ticketAsociado  INT           NOT NULL,
@@ -98,4 +129,5 @@ CREATE TABLE ventas.LineaVenta (
         CASE WHEN idAtraccion IS NOT NULL THEN 1 ELSE 0 END) = 1
     )
 );
+END
 GO
