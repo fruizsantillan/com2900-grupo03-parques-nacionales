@@ -4,189 +4,201 @@
 -- Grupo: 03
 -- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
 -- Fecha: 15/06/2026
--- Descripcion: Script unificado Entrega 5 - Tablas, ABM y logica de negocio. Schema parques.
+-- Descripcion: Script unificado Entrega 5 - DB, schemas, tablas, ABM, negocio, testing.
+--   Correcciones aplicadas:
+--     - Guardaparque y AsignacionGuardaparque movidos al schema personal
+--     - IF NOT EXISTS en todas las tablas
+--     - SPs sin prefijo sp_ (parques.TipoParque_Insertar, etc.)
+--     - SPs de guardaparque/guia en schema personal
+-- =============================================
+
+-- ============================================================
+-- 01 - BASE DE DATOS Y SCHEMAS
+-- ============================================================
+
+-- =============================================
+-- Universidad: Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Comisión: 01-2900 | Grupo 03
+-- Integrantes: Del Vecchio Fabrizio, Ocampos Horacio,
+--              Ruiz Santillán Facundo, Lago Franco Nehuen
+-- Fecha: 15/06/2026
+-- Descripción: Creación de la base de datos y los esquemas
+--              utilizados por los distintos módulos del sistema.
+-- =============================================
+
+-- ==================
+-- BASE DE DATOS
+-- ==================
+IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = 'ParquesNacionales')
+BEGIN
+    CREATE DATABASE ParquesNacionales
+    COLLATE Modern_Spanish_CI_AI;
+END
+GO
+
+USE ParquesNacionales;
+GO
+
+-- ==================
+-- ESQUEMAS
+-- ==================
+
+-- parques: datos maestros de los parques (Parque, TipoParque, Ubicacion)
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'parques')
+    EXEC('CREATE SCHEMA parques');
+GO
+
+-- personal: guardaparques, guías y sus asignaciones
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'personal')
+    EXEC('CREATE SCHEMA personal');
+GO
+
+-- actividades: tours y atracciones ofrecidas en cada parque
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'actividades')
+    EXEC('CREATE SCHEMA actividades');
+GO
+
+-- ventas: tickets, líneas de venta, precios y tipos de visitante
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'ventas')
+    EXEC('CREATE SCHEMA ventas');
+GO
+
+-- concesiones: empresas concesionarias, concesiones y pagos
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'concesiones')
+    EXEC('CREATE SCHEMA concesiones');
+GO
+-- ============================================================
+-- 02 - TABLAS
+-- ============================================================
+
+-- =============================================
+-- Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Grupo: 03
+-- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
+-- Fecha: 15/06/2026
+-- Descripcion: Creacion de tablas del modulo Base.
+--              Tablas: TipoParque, Ubicacion, Parque (schema parques)
+--                      Guardaparque, AsignacionGuardaparque (schema personal)
+-- Dependencias: Schemas creados por 01_creacion_db_schemas.sql
 -- =============================================
 
 USE ParquesNacionales;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'parques')
-    EXEC('CREATE SCHEMA parques');
-GO
-
-
 -- ============================================================
--- TABLAS - Módulo Parques y Guardaparques
--- ============================================================
-
---               Tabla parques.Parque creada por modulo Parques
-
-GO
-
-
---- Creacion del esquema parques
-GO
-
 -- TABLA: TipoParque
--- Tipos de parques
--- Ejemplo: Patagonia, Noreste, Centro
+-- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'TipoParque' AND s.name = 'parques')
+BEGIN
+    CREATE TABLE parques.TipoParque (
+        idTipoParque  INT           IDENTITY(1,1) NOT NULL,
+        descripcion   VARCHAR(100)  NOT NULL,
+        CONSTRAINT PK_TipoParque PRIMARY KEY (idTipoParque)
+    );
+END
+GO
 
-CREATE TABLE parques.TipoParque (
-    idTipoParque  INT           IDENTITY(1,1) NOT NULL,
-    descripcion   VARCHAR(100)  NOT NULL,
-    CONSTRAINT PK_TipoParque PRIMARY KEY (idTipoParque)
-);
-
+-- ============================================================
 -- TABLA: Ubicacion
--- Lugar fisico de un parque
+-- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'Ubicacion' AND s.name = 'parques')
+BEGIN
+    CREATE TABLE parques.Ubicacion (
+        idUbicacion  INT            IDENTITY(1,1) NOT NULL,
+        direccion    VARCHAR(100)   NOT NULL,
+        provincia    VARCHAR(50)    NOT NULL,
+        latitud      DECIMAL(9,6)   NOT NULL,
+        longitud     DECIMAL(9,6)   NOT NULL,
+        CONSTRAINT PK_Ubicacion PRIMARY KEY (idUbicacion)
+    );
+END
+GO
 
-CREATE TABLE parques.Ubicacion (
-    idUbicacion  INT            IDENTITY(1,1) NOT NULL,
-    direccion    VARCHAR(100)   NOT NULL,
-    provincia    VARCHAR(50)    NOT NULL,
-    latitud      DECIMAL(9,6)   NOT NULL,
-    longitud     DECIMAL(9,6)   NOT NULL,
-    CONSTRAINT PK_Ubicacion PRIMARY KEY (idUbicacion)
-);
-
+-- ============================================================
 -- TABLA: Parque
--- Parques registrados
-
-CREATE TABLE parques.Parque (
-    idParque       INT            IDENTITY(1,1) NOT NULL,
-    nombre         VARCHAR(100)   NOT NULL,
-    superficie     DECIMAL(18,2)  NOT NULL,
-    idTipoParque   INT            NOT NULL,
-    idUbicacion    INT            NOT NULL,
-    CONSTRAINT PK_Parque PRIMARY KEY (idParque),
-    CONSTRAINT FK_Parque_TipoParque FOREIGN KEY (idTipoParque) REFERENCES parques.TipoParque (idTipoParque),
-    CONSTRAINT FK_Parque_Ubicacion FOREIGN KEY (idUbicacion) REFERENCES parques.Ubicacion (idUbicacion)
-);
-
--- TABLA: Guardaparque
--- Encargado de un area dentro de un parque
-
-CREATE TABLE parques.Guardaparque (
-    dni              INT    NOT NULL,
-    apyn             VARCHAR(50)    NOT NULL,
-    email            VARCHAR(100)   NULL,
-    telefono         VARCHAR(50)    NULL,
-    localidad        VARCHAR(50)    NULL,
-    fechaNacimiento  DATETIME       NULL,
-    CONSTRAINT PK_Guardaparque PRIMARY KEY (dni)
-);
-
--- TABLA: AsignacionGuardaparque
--- Tabla de marca temporal para la asignacion de los guardaparques
-
-CREATE TABLE parques.AsignacionGuardaparque (
-    idAsignacion   INT            IDENTITY(1,1) NOT NULL,
-    fechaInicio    DATE           NOT NULL,
-    fechaFin       DATE           NULL,
-    motivoEgreso   VARCHAR(255)   NULL,
-    idParque       INT            NOT NULL,
-    dni            INT    NOT NULL,
-    CONSTRAINT PK_AsignacionGuardaparque PRIMARY KEY (idAsignacion),
-    CONSTRAINT FK_AsignacionGuardaparque_Parque FOREIGN KEY (idParque) REFERENCES parques.Parque (idParque),
-    CONSTRAINT FK_AsignacionGuardaparque_Guardaparque FOREIGN KEY (dni) REFERENCES parques.Guardaparque (dni)
-);
-
-
+-- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'Parque' AND s.name = 'parques')
+BEGIN
+    CREATE TABLE parques.Parque (
+        idParque       INT            IDENTITY(1,1) NOT NULL,
+        nombre         VARCHAR(100)   NOT NULL,
+        superficie     DECIMAL(18,2)  NOT NULL,
+        idTipoParque   INT            NOT NULL,
+        idUbicacion    INT            NOT NULL,
+        CONSTRAINT PK_Parque PRIMARY KEY (idParque),
+        CONSTRAINT FK_Parque_TipoParque FOREIGN KEY (idTipoParque) REFERENCES parques.TipoParque (idTipoParque),
+        CONSTRAINT FK_Parque_Ubicacion  FOREIGN KEY (idUbicacion)  REFERENCES parques.Ubicacion  (idUbicacion)
+    );
+END
 GO
-
 
 -- ============================================================
--- TABLAS - Módulo Concesiones
+-- TABLA: Guardaparque (schema personal)
 -- ============================================================
-
---               Tabla parques.Parque creada por modulo Parques
-
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'Guardaparque' AND s.name = 'personal')
+BEGIN
+    CREATE TABLE personal.Guardaparque (
+        dni              INT            NOT NULL,
+        apyn             VARCHAR(50)    NOT NULL,
+        email            VARCHAR(100)   NULL,
+        telefono         VARCHAR(50)    NULL,
+        localidad        VARCHAR(50)    NULL,
+        fechaNacimiento  DATETIME       NULL,
+        CONSTRAINT PK_Guardaparque PRIMARY KEY (dni)
+    );
+END
 GO
-
-GO
-
--- TABLA: TipoDeConsesion
--- Lookup de tipos de actividad concesionada
--- Ejemplos: Gastronomia, Turismo aventura, Comercio minorista
-CREATE TABLE parques.TipoDeConsesion (
-    idTipoConcesion  INT          IDENTITY(1,1)  NOT NULL,
-    descripcion      VARCHAR(100)                NOT NULL,
-    CONSTRAINT PK_TipoDeConsesion             PRIMARY KEY (idTipoConcesion),
-    CONSTRAINT UQ_TipoDeConsesion_descripcion UNIQUE      (descripcion)
-);
-GO
-
--- TABLA: Empresa
--- Datos de la empresa concesionaria
-CREATE TABLE parques.Empresa (
-    idEmpresa    INT          IDENTITY(1,1)  NOT NULL,
-    razonSocial  VARCHAR(200)                NOT NULL,
-    cuit         VARCHAR(20)                 NOT NULL,
-    contacto     VARCHAR(100)                NULL,
-    email        VARCHAR(100)                NULL,
-    telefono     VARCHAR(50)                 NULL,
-    CONSTRAINT PK_Empresa      PRIMARY KEY (idEmpresa),
-    CONSTRAINT UQ_Empresa_cuit UNIQUE      (cuit)
-);
-GO
-
--- TABLA: Concesion
--- Contrato de concesion entre una empresa y un parque
-CREATE TABLE parques.Concesion (
-    idConcesion      INT           IDENTITY(1,1)  NOT NULL,
-    descripcion      VARCHAR(100)                 NOT NULL,
-    idTipoConcesion  INT                          NOT NULL,
-    idParque         INT                          NOT NULL,
-    idEmpresa        INT                          NOT NULL,
-    fechaInicio      DATE                         NOT NULL,
-    fechaFin         DATE                         NOT NULL,
-    canonMensual     DECIMAL(18,2)                NOT NULL,
-    CONSTRAINT PK_Concesion                 PRIMARY KEY (idConcesion),
-    CONSTRAINT FK_Concesion_TipoDeConsesion FOREIGN KEY (idTipoConcesion) REFERENCES parques.TipoDeConsesion(idTipoConcesion),
-    CONSTRAINT FK_Concesion_Empresa         FOREIGN KEY (idEmpresa)       REFERENCES parques.Empresa(idEmpresa),
-    CONSTRAINT FK_Concesion_Parque          FOREIGN KEY (idParque)        REFERENCES parques.Parque(idParque),
-    CONSTRAINT CHK_Concesion_fechas         CHECK (fechaFin > fechaInicio),
-    CONSTRAINT CHK_Concesion_canonMensual   CHECK (canonMensual > 0)
-);
-GO
-
--- TABLA: PagoConcesion
--- Historial de pagos de canon mensual por concesion
--- La constraint UQ_PagoConcesion_periodo impide duplicados a nivel DB
--- (ademas de la validacion en el SP de negocio)
-CREATE TABLE parques.PagoConcesion (
-    idPagoConcesion  INT           IDENTITY(1,1)  NOT NULL,
-    idConcesion      INT                          NOT NULL,
-    monto            DECIMAL(18,2)                NOT NULL,
-    fechaPago        DATE                         NOT NULL,
-    periodoAnio      INT                          NOT NULL,
-    periodoMes       INT                          NOT NULL,
-    CONSTRAINT PK_PagoConcesion              PRIMARY KEY (idPagoConcesion),
-    CONSTRAINT FK_PagoConcesion_Concesion    FOREIGN KEY (idConcesion) REFERENCES parques.Concesion(idConcesion),
-    CONSTRAINT CHK_PagoConcesion_periodoMes  CHECK (periodoMes BETWEEN 1 AND 12),
-    CONSTRAINT CHK_PagoConcesion_periodoAnio CHECK (periodoAnio >= 2020),
-    CONSTRAINT CHK_PagoConcesion_monto       CHECK (monto > 0),
-    CONSTRAINT UQ_PagoConcesion_periodo      UNIQUE (idConcesion, periodoAnio, periodoMes)
-);
-GO
-
-GO
-
 
 -- ============================================================
--- TABLAS - Módulo Guías, Tours y Atracciones
+-- TABLA: AsignacionGuardaparque (schema personal)
 -- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'AsignacionGuardaparque' AND s.name = 'personal')
+BEGIN
+    CREATE TABLE personal.AsignacionGuardaparque (
+        idAsignacion   INT            IDENTITY(1,1) NOT NULL,
+        fechaInicio    DATE           NOT NULL,
+        fechaFin       DATE           NULL,
+        motivoEgreso   VARCHAR(255)   NULL,
+        idParque       INT            NOT NULL,
+        dni            INT            NOT NULL,
+        CONSTRAINT PK_AsignacionGuardaparque PRIMARY KEY (idAsignacion),
+        CONSTRAINT FK_AsignacionGuardaparque_Parque       FOREIGN KEY (idParque) REFERENCES parques.Parque          (idParque),
+        CONSTRAINT FK_AsignacionGuardaparque_Guardaparque FOREIGN KEY (dni)      REFERENCES personal.Guardaparque   (dni)
+    );
+END
+GO
 
+-- =============================================
+-- Universidad: Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Comisión: 01-2900 | Grupo 03
+-- Integrantes: Del Vecchio Fabrizio, Ocampos Horacio,
 --              Ruiz Santillán Facundo, Lago Franco Nehuen
+-- Fecha: 15/06/2026
+-- Descripción: Creación de tablas del módulo Guías, Tours y Atracciones
+-- =============================================
 
+USE ParquesNacionales;
 GO
 
 -- GUIA
 IF NOT EXISTS (SELECT 1 FROM sys.tables t 
                JOIN sys.schemas s ON t.schema_id = s.schema_id
-               WHERE t.name = 'Guia' AND s.name = 'parques')
+               WHERE t.name = 'Guia' AND s.name = 'personal')
 BEGIN
-    CREATE TABLE parques.Guia (
+    CREATE TABLE personal.Guia (
         dni                    INT                NOT NULL,
         apyn                   VARCHAR(100)       NOT NULL,
         especialidad           VARCHAR(100)       NULL,
@@ -201,9 +213,9 @@ GO
 -- TOUR
 IF NOT EXISTS (SELECT 1 FROM sys.tables t 
                JOIN sys.schemas s ON t.schema_id = s.schema_id
-               WHERE t.name = 'Tour' AND s.name = 'parques')
+               WHERE t.name = 'Tour' AND s.name = 'actividades')
 BEGIN
-    CREATE TABLE parques.Tour (
+    CREATE TABLE actividades.Tour (
         idTour      INT IDENTITY(1,1)   NOT NULL,
         nombre      VARCHAR(100)        NOT NULL,
         descripcion VARCHAR(255)        NULL,
@@ -223,9 +235,9 @@ GO
 -- ATRACCION
 IF NOT EXISTS (SELECT 1 FROM sys.tables t 
                JOIN sys.schemas s ON t.schema_id = s.schema_id
-               WHERE t.name = 'Atraccion' AND s.name = 'parques')
+               WHERE t.name = 'Atraccion' AND s.name = 'actividades')
 BEGIN
-    CREATE TABLE parques.Atraccion (
+    CREATE TABLE actividades.Atraccion (
         idAtraccion     INT IDENTITY(1,1)   NOT NULL,
         nombre          VARCHAR(100)        NOT NULL,
         descripcion     VARCHAR(255)        NULL,
@@ -246,127 +258,258 @@ GO
 -- ASIGNACION GUIA
 IF NOT EXISTS (SELECT 1 FROM sys.tables t 
                JOIN sys.schemas s ON t.schema_id = s.schema_id
-               WHERE t.name = 'AsignacionGuia' AND s.name = 'parques')
+               WHERE t.name = 'AsignacionGuia' AND s.name = 'personal')
 BEGIN
-    CREATE TABLE parques.AsignacionGuia (
+    CREATE TABLE personal.AsignacionGuia (
         idAsignacion    INT IDENTITY(1,1)   NOT NULL,
         idTour          INT                 NOT NULL,
         dniGuia         INT                 NOT NULL,
         fechaInicio     DATE                NOT NULL,
         fechaFin        DATE                NOT NULL,
-        CONSTRAINT PK_AsignacionGuia            PRIMARY KEY (idAsignacion),
-        CONSTRAINT FK_AsignacionGuia_Tour       FOREIGN KEY (idTour) REFERENCES parques.Tour(idTour),
-        CONSTRAINT FK_AsignacionGuia_dniGuia       FOREIGN KEY (dniGuia) REFERENCES parques.Guia(dni),
-        CONSTRAINT CHK_AsignacionGuia_fechas    CHECK (fechaFin >= fechaInicio)
+        CONSTRAINT PK_AsignacionGuia         PRIMARY KEY (idAsignacion),
+        CONSTRAINT FK_AsignacionGuia_Tour    FOREIGN KEY (idTour) REFERENCES actividades.Tour(idTour),
+        CONSTRAINT FK_AsignacionGuia_dniGuia FOREIGN KEY (dniGuia) REFERENCES personal.Guia(dni),
+        CONSTRAINT CHK_AsignacionGuia_fechas CHECK (fechaFin >= fechaInicio)
+    );
+END
+GO
+-- =============================================
+-- Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Grupo: 03
+-- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
+-- Fecha: 15/06/2026
+-- Descripcion: Creacion de tablas del modulo Concesiones.
+--              Tablas: TipoDeConsesion, Empresa, Concesion, PagoConcesion
+-- Dependencias: Schemas creados por 01_creacion_db_schemas.sql
+--               Tabla parques.Parque creada por modulo Parques
+-- =============================================
+
+USE ParquesNacionales;
+GO
+
+-- ============================================================
+-- TABLA: TipoDeConsesion
+-- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'TipoDeConsesion' AND s.name = 'concesiones')
+BEGIN
+    CREATE TABLE concesiones.TipoDeConsesion (
+        idTipoConcesion  INT          IDENTITY(1,1)  NOT NULL,
+        descripcion      VARCHAR(100)                NOT NULL,
+        CONSTRAINT PK_TipoDeConsesion             PRIMARY KEY (idTipoConcesion),
+        CONSTRAINT UQ_TipoDeConsesion_descripcion UNIQUE      (descripcion)
     );
 END
 GO
 
+-- ============================================================
+-- TABLA: Empresa
+-- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'Empresa' AND s.name = 'concesiones')
+BEGIN
+    CREATE TABLE concesiones.Empresa (
+        idEmpresa    INT          IDENTITY(1,1)  NOT NULL,
+        razonSocial  VARCHAR(200)                NOT NULL,
+        cuit         VARCHAR(20)                 NOT NULL,
+        contacto     VARCHAR(100)                NULL,
+        email        VARCHAR(100)                NULL,
+        telefono     VARCHAR(50)                 NULL,
+        CONSTRAINT PK_Empresa      PRIMARY KEY (idEmpresa),
+        CONSTRAINT UQ_Empresa_cuit UNIQUE      (cuit)
+    );
+END
 GO
 
+-- ============================================================
+-- TABLA: Concesion
+-- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'Concesion' AND s.name = 'concesiones')
+BEGIN
+    CREATE TABLE concesiones.Concesion (
+        idConcesion      INT           IDENTITY(1,1)  NOT NULL,
+        descripcion      VARCHAR(100)                 NOT NULL,
+        idTipoConcesion  INT                          NOT NULL,
+        idParque         INT                          NOT NULL,
+        idEmpresa        INT                          NOT NULL,
+        fechaInicio      DATE                         NOT NULL,
+        fechaFin         DATE                         NOT NULL,
+        canonMensual     DECIMAL(18,2)                NOT NULL,
+        CONSTRAINT PK_Concesion                 PRIMARY KEY (idConcesion),
+        CONSTRAINT FK_Concesion_TipoDeConsesion FOREIGN KEY (idTipoConcesion) REFERENCES concesiones.TipoDeConsesion(idTipoConcesion),
+        CONSTRAINT FK_Concesion_Empresa         FOREIGN KEY (idEmpresa)       REFERENCES concesiones.Empresa(idEmpresa),
+        CONSTRAINT FK_Concesion_Parque          FOREIGN KEY (idParque)        REFERENCES parques.Parque(idParque),
+        CONSTRAINT CHK_Concesion_fechas         CHECK (fechaFin > fechaInicio),
+        CONSTRAINT CHK_Concesion_canonMensual   CHECK (canonMensual > 0)
+    );
+END
+GO
 
 -- ============================================================
--- TABLAS - Módulo Ventas
+-- TABLA: PagoConcesion
 -- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'PagoConcesion' AND s.name = 'concesiones')
+BEGIN
+    CREATE TABLE concesiones.PagoConcesion (
+        idPagoConcesion  INT           IDENTITY(1,1)  NOT NULL,
+        idConcesion      INT                          NOT NULL,
+        monto            DECIMAL(18,2)                NOT NULL,
+        fechaPago        DATE                         NOT NULL,
+        periodoAnio      INT                          NOT NULL,
+        periodoMes       INT                          NOT NULL,
+        CONSTRAINT PK_PagoConcesion              PRIMARY KEY (idPagoConcesion),
+        CONSTRAINT FK_PagoConcesion_Concesion    FOREIGN KEY (idConcesion) REFERENCES concesiones.Concesion(idConcesion),
+        CONSTRAINT CHK_PagoConcesion_periodoMes  CHECK (periodoMes BETWEEN 1 AND 12),
+        CONSTRAINT CHK_PagoConcesion_periodoAnio CHECK (periodoAnio >= 2020),
+        CONSTRAINT CHK_PagoConcesion_monto       CHECK (monto > 0),
+        CONSTRAINT UQ_PagoConcesion_periodo      UNIQUE (idConcesion, periodoAnio, periodoMes)
+    );
+END
+GO
 
+-- =============================================
+-- Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Grupo: 03
+-- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
+-- Fecha: 15/06/2026
+-- Descripcion: Creacion de tablas del modulo Ventas y Precios.
+--              Tablas: TipoVisitante, PrecioEntrada, TicketVenta, LineaVenta
+-- Dependencias: Schemas creados por 01_creacion_db_schemas.sql
 --               Tabla parques.Parque creada por modulo Parques
---               Tabla parques.Tour creada por modulo Guias, Tours y Atracciones
---               Tabla parques.Atraccion creada por modulo Guias, Tours y Atracciones
+--               Tabla actividades.Tour creada por modulo Guias, Tours y Atracciones
+--               Tabla actividades.Atraccion creada por modulo Guias, Tours y Atracciones
+-- =============================================
 
+USE ParquesNacionales;
 GO
 
-GO
-
+-- ============================================================
 -- TABLA: TipoVisitante
--- Lookup de tipos de visitante
--- Ejemplos: Residente, Extranjero, Jubilado, Estudiante
-CREATE TABLE parques.TipoVisitante (
-    idTipoVisitante  INT          IDENTITY(1,1)  NOT NULL,
-    descripcion      VARCHAR(100)                NOT NULL,
-    CONSTRAINT PK_TipoVisitante             PRIMARY KEY (idTipoVisitante),
-    CONSTRAINT UQ_TipoVisitante_descripcion UNIQUE      (descripcion)
-);
+-- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'TipoVisitante' AND s.name = 'ventas')
+BEGIN
+    CREATE TABLE ventas.TipoVisitante (
+        idTipoVisitante  INT          IDENTITY(1,1)  NOT NULL,
+        descripcion      VARCHAR(100)                NOT NULL,
+        CONSTRAINT PK_TipoVisitante             PRIMARY KEY (idTipoVisitante),
+        CONSTRAINT UQ_TipoVisitante_descripcion UNIQUE      (descripcion)
+    );
+END
 GO
 
+-- ============================================================
 -- TABLA: PrecioEntrada
--- Catalogo historico de precios de entrada por parque y tipo de visitante
--- fechaHasta NULL indica precio vigente
-CREATE TABLE parques.PrecioEntrada (
-    idPrecio           INT           IDENTITY(1,1)  NOT NULL,
-    fechaActualizacion DATE                         NOT NULL,
-    valor              DECIMAL(18,2)                NOT NULL,
-    idParque           INT                          NOT NULL,
-    idTipoVisitante    INT                          NOT NULL,
-    fechaHasta         DATE                         NULL,
-    CONSTRAINT PK_PrecioEntrada               PRIMARY KEY (idPrecio),
-    CONSTRAINT FK_PrecioEntrada_Parque        FOREIGN KEY (idParque)        REFERENCES parques.Parque(idParque),
-    CONSTRAINT FK_PrecioEntrada_TipoVisitante FOREIGN KEY (idTipoVisitante) REFERENCES parques.TipoVisitante(idTipoVisitante),
-    CONSTRAINT CHK_PrecioEntrada_valor        CHECK (valor >= 0)
-);
+-- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'PrecioEntrada' AND s.name = 'ventas')
+BEGIN
+    CREATE TABLE ventas.PrecioEntrada (
+        idPrecio           INT           IDENTITY(1,1)  NOT NULL,
+        fechaActualizacion DATE                         NOT NULL,
+        valor              DECIMAL(18,2)                NOT NULL,
+        idParque           INT                          NOT NULL,
+        idTipoVisitante    INT                          NOT NULL,
+        fechaHasta         DATE                         NULL,
+        CONSTRAINT PK_PrecioEntrada               PRIMARY KEY (idPrecio),
+        CONSTRAINT FK_PrecioEntrada_Parque        FOREIGN KEY (idParque)        REFERENCES parques.Parque(idParque),
+        CONSTRAINT FK_PrecioEntrada_TipoVisitante FOREIGN KEY (idTipoVisitante) REFERENCES ventas.TipoVisitante(idTipoVisitante),
+        CONSTRAINT CHK_PrecioEntrada_valor        CHECK (valor >= 0)
+    );
+END
 GO
 
+-- ============================================================
 -- TABLA: TicketVenta
--- Cabecera del ticket de venta
-CREATE TABLE parques.TicketVenta (
-    idTicket      INT IDENTITY(1,1) NOT NULL,
-    fechaHora     DATETIME      NOT NULL,
-    total         DECIMAL(18,2) NOT NULL,
-    puntoDeVenta  INT           NOT NULL,
-    nroTicket     INT           NOT NULL,
-    formaPago     VARCHAR(50)   NOT NULL,
-    idParque      INT           NULL,
-    CONSTRAINT PK_TicketVenta        PRIMARY KEY (idTicket),
-    CONSTRAINT FK_TicketVenta_Parque FOREIGN KEY (idParque) REFERENCES parques.Parque(idParque),
-    CONSTRAINT CHK_TicketVenta_total CHECK (total >= 0)
-);
+-- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'TicketVenta' AND s.name = 'ventas')
+BEGIN
+    CREATE TABLE ventas.TicketVenta (
+        idTicket      INT IDENTITY(1,1) NOT NULL,
+        fechaHora     DATETIME      NOT NULL,
+        total         DECIMAL(18,2) NOT NULL,
+        puntoDeVenta  INT           NOT NULL,
+        nroTicket     INT           NOT NULL,
+        formaPago     VARCHAR(50)   NOT NULL,
+        idParque      INT           NULL,
+        CONSTRAINT PK_TicketVenta        PRIMARY KEY (idTicket),
+        CONSTRAINT FK_TicketVenta_Parque FOREIGN KEY (idParque) REFERENCES parques.Parque(idParque),
+        CONSTRAINT CHK_TicketVenta_total CHECK (total >= 0)
+    );
+END
 GO
 
+-- ============================================================
 -- TABLA: LineaVenta
--- Detalle o renglon del ticket de venta
--- Puede representar una entrada, un tour o una atraccion
-CREATE TABLE parques.LineaVenta (
-    idLineaVenta    INT IDENTITY(1,1) NOT NULL,
-    ticketAsociado  INT           NOT NULL,
-    descripcion     VARCHAR(50)   NOT NULL,
-    subtotal        DECIMAL(18,2) NOT NULL,
-    cantidad        INT           NOT NULL,
-    precioUnitario  DECIMAL(18,2) NOT NULL,
-    idPrecioEntrada INT           NULL,
-    idTour          INT           NULL,
-    idAtraccion     INT           NULL,
-    CONSTRAINT PK_LineaVenta                 PRIMARY KEY (idLineaVenta),
-    CONSTRAINT FK_LineaVenta_PrecioEntrada   FOREIGN KEY (idPrecioEntrada) REFERENCES parques.PrecioEntrada(idPrecio),
-    CONSTRAINT FK_LineaVenta_TicketVenta     FOREIGN KEY (ticketAsociado) REFERENCES parques.TicketVenta(idTicket),
-    CONSTRAINT FK_LineaVenta_Tour            FOREIGN KEY (idTour) REFERENCES parques.Tour(idTour),
-    CONSTRAINT FK_LineaVenta_Atraccion       FOREIGN KEY (idAtraccion) REFERENCES parques.Atraccion(idAtraccion),
-    CONSTRAINT CHK_LineaVenta_cantidad       CHECK (cantidad > 0),
-    CONSTRAINT CHK_LineaVenta_precioUnitario CHECK (precioUnitario >= 0),
-    CONSTRAINT CHK_LineaVenta_subtotal       CHECK (subtotal >= 0),
-    CONSTRAINT CHK_LineaVenta_UnSoloItem CHECK (
-        (CASE WHEN idPrecioEntrada IS NOT NULL THEN 1 ELSE 0 END +
-        CASE WHEN idTour IS NOT NULL THEN 1 ELSE 0 END +
-        CASE WHEN idAtraccion IS NOT NULL THEN 1 ELSE 0 END) = 1
-    )
-);
+-- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'LineaVenta' AND s.name = 'ventas')
+BEGIN
+    CREATE TABLE ventas.LineaVenta (
+        idLineaVenta    INT IDENTITY(1,1) NOT NULL,
+        ticketAsociado  INT           NOT NULL,
+        descripcion     VARCHAR(50)   NOT NULL,
+        subtotal        DECIMAL(18,2) NOT NULL,
+        cantidad        INT           NOT NULL,
+        precioUnitario  DECIMAL(18,2) NOT NULL,
+        idPrecioEntrada INT           NULL,
+        idTour          INT           NULL,
+        idAtraccion     INT           NULL,
+        CONSTRAINT PK_LineaVenta                 PRIMARY KEY (idLineaVenta),
+        CONSTRAINT FK_LineaVenta_PrecioEntrada   FOREIGN KEY (idPrecioEntrada) REFERENCES ventas.PrecioEntrada(idPrecio),
+        CONSTRAINT FK_LineaVenta_TicketVenta     FOREIGN KEY (ticketAsociado)  REFERENCES ventas.TicketVenta(idTicket),
+        CONSTRAINT FK_LineaVenta_Tour            FOREIGN KEY (idTour)          REFERENCES actividades.Tour(idTour),
+        CONSTRAINT FK_LineaVenta_Atraccion       FOREIGN KEY (idAtraccion)     REFERENCES actividades.Atraccion(idAtraccion),
+        CONSTRAINT CHK_LineaVenta_cantidad       CHECK (cantidad > 0),
+        CONSTRAINT CHK_LineaVenta_precioUnitario CHECK (precioUnitario >= 0),
+        CONSTRAINT CHK_LineaVenta_subtotal       CHECK (subtotal >= 0),
+        CONSTRAINT CHK_LineaVenta_UnSoloItem CHECK (
+            (CASE WHEN idPrecioEntrada IS NOT NULL THEN 1 ELSE 0 END +
+             CASE WHEN idTour          IS NOT NULL THEN 1 ELSE 0 END +
+             CASE WHEN idAtraccion     IS NOT NULL THEN 1 ELSE 0 END) = 1
+        )
+    );
+END
 GO
 
-GO
-
-
 -- ============================================================
--- ABM - Parques y Guardaparques
+-- 03 - ABM
 -- ============================================================
 
+-- =============================================
+-- Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Grupo: 03
+-- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
+-- Fecha: 15/06/2026
+-- Descripcion: Stored Procedures de ABM para el modulo Parques.
 --              SPs: TipoParque             (Insertar/Actualizar/Eliminar/ObtenerPorId)
 --                   Ubicacion              (Insertar/Actualizar/Eliminar/ObtenerPorId)
 --                   Parque                 (Insertar/Actualizar/Eliminar/ObtenerPorId)
 --                   Guardaparque           (Insertar/Actualizar/Eliminar/ObtenerPorId)
 --                   AsignacionGuardaparque (Insertar/Actualizar/Eliminar/ObtenerPorId)
+-- =============================================
 
+USE ParquesNacionales;
 GO
 
+-- ==================
 -- TIPO DE PARQUE - INSERTAR
-CREATE OR ALTER PROCEDURE parques.sp_TipoParque_Insertar
+-- ==================
+CREATE OR ALTER PROCEDURE parques.TipoParque_Insertar
     @descripcion VARCHAR(100)
 AS
 BEGIN
@@ -393,8 +536,10 @@ BEGIN
 END
 GO
 
+-- ==================
 -- TIPO DE PARQUE - ACTUALIZAR
-CREATE OR ALTER PROCEDURE parques.sp_TipoParque_Actualizar
+-- ==================
+CREATE OR ALTER PROCEDURE parques.TipoParque_Actualizar
     @idTipoParque INT,
     @descripcion  VARCHAR(100)
 AS
@@ -428,8 +573,10 @@ BEGIN
 END
 GO
 
+-- ==================
 -- TIPO DE PARQUE - ELIMINAR
-CREATE OR ALTER PROCEDURE parques.sp_TipoParque_Eliminar
+-- ==================
+CREATE OR ALTER PROCEDURE parques.TipoParque_Eliminar
     @idTipoParque INT
 AS
 BEGIN
@@ -455,8 +602,10 @@ BEGIN
 END
 GO
 
+-- ==================
 -- TIPO DE PARQUE - OBTENER POR ID
-CREATE OR ALTER PROCEDURE parques.sp_TipoParque_ObtenerPorId
+-- ==================
+CREATE OR ALTER PROCEDURE parques.TipoParque_ObtenerPorId
     @idTipoParque INT
 AS
 BEGIN
@@ -468,8 +617,10 @@ BEGIN
 END
 GO
 
+-- ==================
 -- UBICACION - INSERTAR
-CREATE OR ALTER PROCEDURE parques.sp_Ubicacion_Insertar
+-- ==================
+CREATE OR ALTER PROCEDURE parques.Ubicacion_Insertar
     @direccion VARCHAR(100),
     @provincia VARCHAR(50),
     @latitud   DECIMAL(9,6),
@@ -504,8 +655,10 @@ BEGIN
 END
 GO
 
+-- ==================
 -- UBICACION - ACTUALIZAR
-CREATE OR ALTER PROCEDURE parques.sp_Ubicacion_Actualizar
+-- ==================
+CREATE OR ALTER PROCEDURE parques.Ubicacion_Actualizar
     @idUbicacion INT,
     @direccion   VARCHAR(100),
     @provincia   VARCHAR(50),
@@ -549,8 +702,10 @@ BEGIN
 END
 GO
 
+-- ==================
 -- UBICACION - ELIMINAR
-CREATE OR ALTER PROCEDURE parques.sp_Ubicacion_Eliminar
+-- ==================
+CREATE OR ALTER PROCEDURE parques.Ubicacion_Eliminar
     @idUbicacion INT
 AS
 BEGIN
@@ -576,8 +731,10 @@ BEGIN
 END
 GO
 
+-- ==================
 -- UBICACION - OBTENER POR ID
-CREATE OR ALTER PROCEDURE parques.sp_Ubicacion_ObtenerPorId
+-- ==================
+CREATE OR ALTER PROCEDURE parques.Ubicacion_ObtenerPorId
     @idUbicacion INT
 AS
 BEGIN
@@ -589,8 +746,10 @@ BEGIN
 END
 GO
 
+-- ==================
 -- PARQUE - INSERTAR
-CREATE OR ALTER PROCEDURE parques.sp_Parque_Insertar
+-- ==================
+CREATE OR ALTER PROCEDURE parques.Parque_Insertar
     @nombre       VARCHAR(100),
     @superficie   DECIMAL(18,2),
     @idTipoParque INT,
@@ -631,8 +790,10 @@ BEGIN
 END
 GO
 
+-- ==================
 -- PARQUE - ACTUALIZAR
-CREATE OR ALTER PROCEDURE parques.sp_Parque_Actualizar
+-- ==================
+CREATE OR ALTER PROCEDURE parques.Parque_Actualizar
     @idParque     INT,
     @nombre       VARCHAR(100),
     @superficie   DECIMAL(18,2),
@@ -683,13 +844,15 @@ BEGIN
 END
 GO
 
+-- ==================
 -- PARQUE - ELIMINAR
+-- ==================
 -- Un parque es referenciado desde varios modulos. NO puede eliminarse si tiene:
---   parques.Tour, parques.Atraccion, parques.AsignacionGuardaparque
---   parques.PrecioEntrada, parques.TicketVenta  (esquema ventas, modulo en construccion)
---   parques.Concesion
+--   actividades.Tour, actividades.Atraccion, personal.AsignacionGuardaparque
+--   ventas.PrecioEntrada, ventas.TicketVenta  (esquema ventas, modulo en construccion)
+--   concesiones.Concesion
     
-CREATE OR ALTER PROCEDURE parques.sp_Parque_Eliminar
+CREATE OR ALTER PROCEDURE parques.Parque_Eliminar
     @idParque INT
 AS
 BEGIN
@@ -700,27 +863,27 @@ BEGIN
                    WHERE idParque = @idParque)
         SET @vErrores += '- No existe un parque con el ID indicado.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.Tour
+    IF EXISTS (SELECT 1 FROM actividades.Tour
                WHERE idParque = @idParque)
         SET @vErrores += '- No se puede eliminar: el parque tiene tours registrados.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.Atraccion
+    IF EXISTS (SELECT 1 FROM actividades.Atraccion
                WHERE idParque = @idParque)
         SET @vErrores += '- No se puede eliminar: el parque tiene atracciones registradas.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.AsignacionGuardaparque
+    IF EXISTS (SELECT 1 FROM personal.AsignacionGuardaparque
                WHERE idParque = @idParque)
         SET @vErrores += '- No se puede eliminar: el parque tiene asignaciones de guardaparques.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.PrecioEntrada
+    IF EXISTS (SELECT 1 FROM ventas.PrecioEntrada
                WHERE idParque = @idParque)
         SET @vErrores += '- No se puede eliminar: el parque tiene precios de entrada registrados.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.TicketVenta
+    IF EXISTS (SELECT 1 FROM ventas.TicketVenta
                WHERE idParque = @idParque)
         SET @vErrores += '- No se puede eliminar: el parque tiene ventas registradas.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.Concesion
+    IF EXISTS (SELECT 1 FROM concesiones.Concesion
                WHERE idParque = @idParque)
         SET @vErrores += '- No se puede eliminar: el parque tiene concesiones registradas.' + CHAR(13);
 
@@ -735,8 +898,10 @@ BEGIN
 END
 GO
 
+-- ==================
 -- PARQUE - OBTENER POR ID
-CREATE OR ALTER PROCEDURE parques.sp_Parque_ObtenerPorId
+-- ==================
+CREATE OR ALTER PROCEDURE parques.Parque_ObtenerPorId
     @idParque INT
 AS
 BEGIN
@@ -748,8 +913,10 @@ BEGIN
 END
 GO
 
+-- ==================
 -- GUARDAPARQUE - INSERTAR
-CREATE OR ALTER PROCEDURE parques.sp_Guardaparque_Insertar
+-- ==================
+CREATE OR ALTER PROCEDURE personal.Guardaparque_Insertar
     @dni             INT,
     @apyn            VARCHAR(50),
     @email           VARCHAR(100) = NULL,
@@ -763,7 +930,7 @@ BEGIN
 
     IF @dni IS NULL OR @dni <= 0
         SET @vErrores += '- El DNI es obligatorio y debe ser mayor a 0.' + CHAR(13);
-    ELSE IF EXISTS (SELECT 1 FROM parques.Guardaparque
+    ELSE IF EXISTS (SELECT 1 FROM personal.Guardaparque
                     WHERE dni = @dni)
         SET @vErrores += '- Ya existe un guardaparque registrado con ese DNI.' + CHAR(13);
 
@@ -782,15 +949,17 @@ BEGIN
         RETURN;
     END
 
-    INSERT INTO parques.Guardaparque (dni, apyn, email, telefono, localidad, fechaNacimiento)
+    INSERT INTO personal.Guardaparque (dni, apyn, email, telefono, localidad, fechaNacimiento)
     VALUES (@dni, LTRIM(RTRIM(@apyn)), @email, @telefono, @localidad, @fechaNacimiento);
 
     PRINT 'Guardaparque registrado con DNI: ' + CAST(@dni AS VARCHAR);
 END
 GO
 
+-- ==================
 -- GUARDAPARQUE - ACTUALIZAR
-CREATE OR ALTER PROCEDURE parques.sp_Guardaparque_Actualizar
+-- ==================
+CREATE OR ALTER PROCEDURE personal.Guardaparque_Actualizar
     @dni             INT,
     @apyn            VARCHAR(50),
     @email           VARCHAR(100) = NULL,
@@ -802,7 +971,7 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Guardaparque
+    IF NOT EXISTS (SELECT 1 FROM personal.Guardaparque
                    WHERE dni = @dni)
         SET @vErrores += '- No existe un guardaparque con el DNI indicado.' + CHAR(13);
 
@@ -821,7 +990,7 @@ BEGIN
         RETURN;
     END
 
-    UPDATE parques.Guardaparque
+    UPDATE personal.Guardaparque
     SET apyn            = LTRIM(RTRIM(@apyn)),
         email           = @email,
         telefono        = @telefono,
@@ -833,19 +1002,21 @@ BEGIN
 END
 GO
 
+-- ==================
 -- GUARDAPARQUE - ELIMINAR
-CREATE OR ALTER PROCEDURE parques.sp_Guardaparque_Eliminar
+-- ==================
+CREATE OR ALTER PROCEDURE personal.Guardaparque_Eliminar
     @dni INT
 AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Guardaparque
+    IF NOT EXISTS (SELECT 1 FROM personal.Guardaparque
                    WHERE dni = @dni)
         SET @vErrores += '- No existe un guardaparque con el DNI indicado.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.AsignacionGuardaparque
+    IF EXISTS (SELECT 1 FROM personal.AsignacionGuardaparque
                WHERE dni = @dni)
         SET @vErrores += '- No se puede eliminar: el guardaparque tiene asignaciones registradas.' + CHAR(13);
 
@@ -855,26 +1026,30 @@ BEGIN
         RETURN;
     END
 
-    DELETE FROM parques.Guardaparque WHERE dni = @dni;
+    DELETE FROM personal.Guardaparque WHERE dni = @dni;
     PRINT 'Guardaparque eliminado.';
 END
 GO
 
+-- ==================
 -- GUARDAPARQUE - OBTENER POR ID
-CREATE OR ALTER PROCEDURE parques.sp_Guardaparque_ObtenerPorId
+-- ==================
+CREATE OR ALTER PROCEDURE personal.Guardaparque_ObtenerPorId
     @dni INT
 AS
 BEGIN
     SET NOCOUNT ON;
 
     SELECT dni, apyn, email, telefono, localidad, fechaNacimiento
-    FROM parques.Guardaparque
+    FROM personal.Guardaparque
     WHERE dni = @dni;
 END
 GO
 
+-- ==================
 -- ASIGNACION GUARDAPARQUE - INSERTAR
-CREATE OR ALTER PROCEDURE parques.sp_AsignacionGuardaparque_Insertar
+-- ==================
+CREATE OR ALTER PROCEDURE personal.AsignacionGuardaparque_Insertar
     @fechaInicio  DATE,
     @idParque     INT,
     @dni          INT,
@@ -892,7 +1067,7 @@ BEGIN
                    WHERE idParque = @idParque)
         SET @vErrores += '- El parque indicado no existe.' + CHAR(13);
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Guardaparque
+    IF NOT EXISTS (SELECT 1 FROM personal.Guardaparque
                    WHERE dni = @dni)
         SET @vErrores += '- El guardaparque indicado no existe.' + CHAR(13);
 
@@ -902,7 +1077,7 @@ BEGIN
     IF @fechaFin IS NOT NULL AND (@motivoEgreso IS NULL OR LTRIM(RTRIM(@motivoEgreso)) = '')
         SET @vErrores += '- Si se indica fecha de fin, el motivo de egreso es obligatorio.' + CHAR(13);
 
-    IF @fechaFin IS NULL AND EXISTS (SELECT 1 FROM parques.AsignacionGuardaparque
+    IF @fechaFin IS NULL AND EXISTS (SELECT 1 FROM personal.AsignacionGuardaparque
                                      WHERE dni = @dni AND fechaFin IS NULL)
         SET @vErrores += '- El guardaparque ya tiene una asignacion activa (sin fecha de fin).' + CHAR(13);
 
@@ -912,7 +1087,7 @@ BEGIN
         RETURN;
     END
 
-    INSERT INTO parques.AsignacionGuardaparque
+    INSERT INTO personal.AsignacionGuardaparque
         (fechaInicio, fechaFin, motivoEgreso, idParque, dni)
     VALUES
         (@fechaInicio, @fechaFin, @motivoEgreso, @idParque, @dni);
@@ -921,8 +1096,10 @@ BEGIN
 END
 GO
 
+-- ==================
 -- ASIGNACION GUARDAPARQUE - ACTUALIZAR
-CREATE OR ALTER PROCEDURE parques.sp_AsignacionGuardaparque_Actualizar
+-- ==================
+CREATE OR ALTER PROCEDURE personal.AsignacionGuardaparque_Actualizar
     @idAsignacion INT,
     @fechaInicio  DATE,
     @idParque     INT,
@@ -934,7 +1111,7 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.AsignacionGuardaparque
+    IF NOT EXISTS (SELECT 1 FROM personal.AsignacionGuardaparque
                    WHERE idAsignacion = @idAsignacion)
         SET @vErrores += '- No existe una asignacion con el ID indicado.' + CHAR(13);
 
@@ -945,7 +1122,7 @@ BEGIN
                    WHERE idParque = @idParque)
         SET @vErrores += '- El parque indicado no existe.' + CHAR(13);
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Guardaparque
+    IF NOT EXISTS (SELECT 1 FROM personal.Guardaparque
                    WHERE dni = @dni)
         SET @vErrores += '- El guardaparque indicado no existe.' + CHAR(13);
 
@@ -955,7 +1132,7 @@ BEGIN
     IF @fechaFin IS NOT NULL AND (@motivoEgreso IS NULL OR LTRIM(RTRIM(@motivoEgreso)) = '')
         SET @vErrores += '- Si se indica fecha de fin, el motivo de egreso es obligatorio.' + CHAR(13);
 
-    IF @fechaFin IS NULL AND EXISTS (SELECT 1 FROM parques.AsignacionGuardaparque
+    IF @fechaFin IS NULL AND EXISTS (SELECT 1 FROM personal.AsignacionGuardaparque
                                      WHERE dni = @dni
                                        AND fechaFin IS NULL
                                        AND idAsignacion != @idAsignacion)
@@ -967,7 +1144,7 @@ BEGIN
         RETURN;
     END
 
-    UPDATE parques.AsignacionGuardaparque
+    UPDATE personal.AsignacionGuardaparque
     SET fechaInicio  = @fechaInicio,
         fechaFin     = @fechaFin,
         motivoEgreso = @motivoEgreso,
@@ -979,57 +1156,507 @@ BEGIN
 END
 GO
 
+-- ==================
 -- ASIGNACION GUARDAPARQUE - ELIMINAR
-CREATE OR ALTER PROCEDURE parques.sp_AsignacionGuardaparque_Eliminar
+-- ==================
+CREATE OR ALTER PROCEDURE personal.AsignacionGuardaparque_Eliminar
     @idAsignacion INT
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    IF NOT EXISTS (SELECT 1 FROM parques.AsignacionGuardaparque
+    IF NOT EXISTS (SELECT 1 FROM personal.AsignacionGuardaparque
                    WHERE idAsignacion = @idAsignacion)
     BEGIN
         RAISERROR('- No existe una asignacion con el ID indicado.', 16, 1);
         RETURN;
     END
 
-    DELETE FROM parques.AsignacionGuardaparque WHERE idAsignacion = @idAsignacion;
+    DELETE FROM personal.AsignacionGuardaparque WHERE idAsignacion = @idAsignacion;
     PRINT 'Asignacion eliminada.';
 END
 GO
 
+-- ==================
 -- ASIGNACION GUARDAPARQUE - OBTENER POR ID
-CREATE OR ALTER PROCEDURE parques.sp_AsignacionGuardaparque_ObtenerPorId
+-- ==================
+CREATE OR ALTER PROCEDURE personal.AsignacionGuardaparque_ObtenerPorId
     @idAsignacion INT
 AS
 BEGIN
     SET NOCOUNT ON;
 
     SELECT idAsignacion, fechaInicio, fechaFin, motivoEgreso, idParque, dni
-    FROM parques.AsignacionGuardaparque
+    FROM personal.AsignacionGuardaparque
     WHERE idAsignacion = @idAsignacion;
 END
 GO
 
+-- =============================================
+-- Universidad: Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Comisión: 01-2900 | Grupo 03
+-- Integrantes: Del Vecchio Fabrizio, Ocampos Horacio,
+--              Ruiz Santillán Facundo, Lago Franco Nehuen
+-- Fecha: 15/06/2026
+-- Descripción: SPs ABM del módulo Guías, Tours y Atracciones
+-- =============================================
+
+USE ParquesNacionales;
 GO
 
+-- ==================
+-- GUIA - INSERTAR
+-- ==================
+CREATE OR ALTER PROCEDURE personal.Guia_Insertar
+    @dni                    INT,
+    @apyn                   VARCHAR(100),
+    @especialidad           VARCHAR(100) = NULL,
+    @titulo                 VARCHAR(100) = NULL,
+    @habilitaciones         VARCHAR(255) = NULL,
+    @vigenciaAutorizacion   DATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @vErrores VARCHAR(500) = '';
 
--- ============================================================
--- ABM - Concesiones
--- ============================================================
+    IF @dni IS NULL OR @dni <= 0
+        SET @vErrores += '- El DNI es obligatorio y debe ser mayor a 0.' + CHAR(13);
+    IF @apyn IS NULL OR LTRIM(RTRIM(@apyn)) = ''
+        SET @vErrores += '- El nombre y apellido es obligatorio.' + CHAR(13);
+    IF @vigenciaAutorizacion IS NULL
+        SET @vErrores += '- La vigencia de autorización es obligatoria.' + CHAR(13);
+    IF @dni IS NOT NULL AND EXISTS (SELECT 1 FROM personal.Guia WHERE dni = @dni)
+        SET @vErrores += '- Ya existe un guía registrado con ese DNI.' + CHAR(13);
 
+    IF @vErrores != ''
+    BEGIN
+        RAISERROR(@vErrores, 16, 1);
+        RETURN;
+    END
+
+    INSERT INTO personal.Guia (dni, apyn, especialidad, titulo, habilitaciones, vigenciaAutorizacion)
+    VALUES (@dni, @apyn, @especialidad, @titulo, @habilitaciones, @vigenciaAutorizacion);
+END
+GO
+
+-- ==================
+-- GUIA - ACTUALIZAR
+-- ==================
+CREATE OR ALTER PROCEDURE personal.Guia_Actualizar
+    @dni                    INT,
+    @especialidad           VARCHAR(100) = NULL,
+    @titulo                 VARCHAR(100) = NULL,
+    @habilitaciones         VARCHAR(255) = NULL,
+    @vigenciaAutorizacion   DATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @vErrores VARCHAR(500) = '';
+
+    IF NOT EXISTS (SELECT 1 FROM personal.Guia WHERE dni = @dni)
+        SET @vErrores += '- No existe un guía con ese DNI.' + CHAR(13);
+    IF @vigenciaAutorizacion IS NULL
+        SET @vErrores += '- La vigencia de autorización es obligatoria.' + CHAR(13);
+
+    IF @vErrores != ''
+    BEGIN
+        RAISERROR(@vErrores, 16, 1);
+        RETURN;
+    END
+
+    UPDATE personal.Guia
+    SET especialidad = @especialidad,
+        titulo = @titulo,
+        habilitaciones = @habilitaciones,
+        vigenciaAutorizacion = @vigenciaAutorizacion
+    WHERE dni = @dni;
+END
+GO
+
+-- ==================
+-- GUIA - ELIMINAR
+-- ==================
+CREATE OR ALTER PROCEDURE personal.Guia_Eliminar
+    @dni INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @vErrores VARCHAR(500) = '';
+
+    IF NOT EXISTS (SELECT 1 FROM personal.Guia WHERE dni = @dni)
+        SET @vErrores += '- No existe un guía con ese DNI.' + CHAR(13);
+    IF EXISTS (SELECT 1 FROM personal.AsignacionGuia WHERE dniGuia = @dni)
+        SET @vErrores += '- El guía tiene tours asignados y no puede eliminarse.' + CHAR(13);
+
+    IF @vErrores != ''
+    BEGIN
+        RAISERROR(@vErrores, 16, 1);
+        RETURN;
+    END
+
+    DELETE FROM personal.Guia WHERE dni = @dni;
+END
+GO
+
+-- ==================
+-- GUIA - OBTENER POR ID
+-- ==================
+CREATE OR ALTER PROCEDURE personal.Guia_ObtenerPorId
+    @dni INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT * FROM personal.Guia WHERE dni = @dni;
+END
+GO
+
+-- ==================
+-- TOUR - INSERTAR
+-- ==================
+CREATE OR ALTER PROCEDURE actividades.Tour_Insertar
+    @nombre      VARCHAR(100),
+    @descripcion VARCHAR(255) = NULL,
+    @duracion    INT,
+    @cupoMaximo  INT,
+    @precio      DECIMAL(18,2),
+    @idParque    INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @vErrores VARCHAR(500) = '';
+
+    IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
+        SET @vErrores += '- El nombre del tour es obligatorio.' + CHAR(13);
+    IF @duracion IS NULL OR @duracion <= 0
+        SET @vErrores += '- La duración debe ser mayor a 0 minutos.' + CHAR(13);
+    IF @cupoMaximo IS NULL OR @cupoMaximo <= 0
+        SET @vErrores += '- El cupo máximo debe ser mayor a 0.' + CHAR(13);
+    IF @precio IS NULL OR @precio < 0
+        SET @vErrores += '- El precio no puede ser negativo.' + CHAR(13);
+    IF NOT EXISTS (SELECT 1 FROM parques.Parque WHERE idParque = @idParque)
+        SET @vErrores += '- El parque especificado no existe.' + CHAR(13);
+
+    IF @vErrores != ''
+    BEGIN
+        RAISERROR(@vErrores, 16, 1);
+        RETURN;
+    END
+
+    INSERT INTO actividades.Tour (nombre, descripcion, duracion, cupoMaximo, precio, idParque)
+    VALUES (@nombre, @descripcion, @duracion, @cupoMaximo, @precio, @idParque);
+END
+GO
+
+-- ==================
+-- TOUR - ACTUALIZAR
+-- ==================
+CREATE OR ALTER PROCEDURE actividades.Tour_Actualizar
+    @idTour      INT,
+    @nombre      VARCHAR(100),
+    @descripcion VARCHAR(255) = NULL,
+    @duracion    INT,
+    @cupoMaximo  INT,
+    @precio      DECIMAL(18,2)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @vErrores VARCHAR(500) = '';
+
+    IF NOT EXISTS (SELECT 1 FROM actividades.Tour WHERE idTour = @idTour)
+        SET @vErrores += '- No existe un tour con el ID especificado.' + CHAR(13);
+    IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
+        SET @vErrores += '- El nombre del tour es obligatorio.' + CHAR(13);
+    IF @duracion IS NULL OR @duracion <= 0
+        SET @vErrores += '- La duración debe ser mayor a 0 minutos.' + CHAR(13);
+    IF @cupoMaximo IS NULL OR @cupoMaximo <= 0
+        SET @vErrores += '- El cupo máximo debe ser mayor a 0.' + CHAR(13);
+    IF @precio IS NULL OR @precio < 0
+        SET @vErrores += '- El precio no puede ser negativo.' + CHAR(13);
+
+    IF @vErrores != ''
+    BEGIN
+        RAISERROR(@vErrores, 16, 1);
+        RETURN;
+    END
+
+    UPDATE actividades.Tour
+    SET nombre = @nombre,
+        descripcion = @descripcion,
+        duracion = @duracion,
+        cupoMaximo = @cupoMaximo,
+        precio = @precio
+    WHERE idTour = @idTour;
+END
+GO
+
+-- ==================
+-- TOUR - ELIMINAR
+-- ==================
+CREATE OR ALTER PROCEDURE actividades.Tour_Eliminar
+    @idTour INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @vErrores VARCHAR(500) = '';
+
+    IF NOT EXISTS (SELECT 1 FROM actividades.Tour WHERE idTour = @idTour)
+        SET @vErrores += '- No existe el tour con el ID especificado.' + CHAR(13);
+    IF EXISTS (SELECT 1 FROM personal.AsignacionGuia WHERE idTour = @idTour)
+        SET @vErrores += '- El tour tiene un historial de guías asignados y no puede eliminarse.' + CHAR(13);
+    IF EXISTS (SELECT 1 FROM ventas.LineaVenta WHERE idTour = @idTour)
+        SET @vErrores += '- El tour posee registros de ventas asociadas y no puede eliminarse.' + CHAR(13);
+
+    IF @vErrores != ''
+    BEGIN
+        RAISERROR(@vErrores, 16, 1);
+        RETURN;
+    END
+
+    DELETE FROM actividades.Tour WHERE idTour = @idTour;
+END
+GO
+
+-- ==================
+-- TOUR - OBTENER POR ID
+-- ==================
+CREATE OR ALTER PROCEDURE actividades.Tour_ObtenerPorId
+    @idTour INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT * FROM actividades.Tour WHERE idTour = @idTour;
+END
+GO
+
+-- ==================
+-- ATRACCION - INSERTAR
+-- ==================
+CREATE OR ALTER PROCEDURE actividades.Atraccion_Insertar
+    @nombre      VARCHAR(100),
+    @descripcion VARCHAR(255) = NULL,
+    @tipo        VARCHAR(50) = NULL,
+    @precio      DECIMAL(18,2),
+    @duracion    INT,
+    @cupoMaximo  INT,
+    @idParque    INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @vErrores VARCHAR(500) = '';
+
+    IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
+        SET @vErrores += '- El nombre de la atracción es obligatorio.' + CHAR(13);
+    IF @duracion IS NULL OR @duracion <= 0
+        SET @vErrores += '- La duración debe ser mayor a 0 minutos.' + CHAR(13);
+    IF @cupoMaximo IS NULL OR @cupoMaximo <= 0
+        SET @vErrores += '- El cupo máximo debe ser mayor a 0.' + CHAR(13);
+    IF @precio IS NULL OR @precio < 0
+        SET @vErrores += '- El precio no puede ser negativo.' + CHAR(13);
+    IF NOT EXISTS (SELECT 1 FROM parques.Parque WHERE idParque = @idParque)
+        SET @vErrores += '- El parque especificado no existe.' + CHAR(13);
+
+    IF @vErrores != ''
+    BEGIN
+        RAISERROR(@vErrores, 16, 1);
+        RETURN;
+    END
+
+    INSERT INTO actividades.Atraccion (nombre, descripcion, tipo, precio, duracion, cupoMaximo, idParque)
+    VALUES (@nombre, @descripcion, @tipo, @precio, @duracion, @cupoMaximo, @idParque);
+END
+GO
+
+-- ==================
+-- ATRACCION - ACTUALIZAR
+-- ==================
+CREATE OR ALTER PROCEDURE actividades.Atraccion_Actualizar
+    @idAtraccion INT,
+    @nombre      VARCHAR(100),
+    @descripcion VARCHAR(255) = NULL,
+    @tipo        VARCHAR(50) = NULL,
+    @precio      DECIMAL(18,2),
+    @duracion    INT,
+    @cupoMaximo  INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @vErrores VARCHAR(500) = '';
+
+    IF NOT EXISTS (SELECT 1 FROM actividades.Atraccion WHERE idAtraccion = @idAtraccion)
+        SET @vErrores += '- No existe la atracción con el ID especificado.' + CHAR(13);
+    IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
+        SET @vErrores += '- El nombre es obligatorio.' + CHAR(13);
+    IF @duracion IS NULL OR @duracion <= 0
+        SET @vErrores += '- La duración debe ser mayor a 0.' + CHAR(13);
+    IF @cupoMaximo IS NULL OR @cupoMaximo <= 0
+        SET @vErrores += '- El cupo máximo debe ser mayor a 0.' + CHAR(13);
+    IF @precio IS NULL OR @precio < 0
+        SET @vErrores += '- El precio no puede ser negativo.' + CHAR(13);
+
+    IF @vErrores != ''
+    BEGIN
+        RAISERROR(@vErrores, 16, 1);
+        RETURN;
+    END
+
+    UPDATE actividades.Atraccion
+    SET nombre = @nombre,
+        descripcion = @descripcion,
+        tipo = @tipo,
+        precio = @precio,
+        duracion = @duracion,
+        cupoMaximo = @cupoMaximo
+    WHERE idAtraccion = @idAtraccion;
+END
+GO
+
+-- ==================
+-- ATRACCION - ELIMINAR
+-- ==================
+CREATE OR ALTER PROCEDURE actividades.Atraccion_Eliminar
+    @idAtraccion INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @vErrores VARCHAR(500) = '';
+
+    IF NOT EXISTS (SELECT 1 FROM actividades.Atraccion WHERE idAtraccion = @idAtraccion)
+        SET @vErrores += '- No existe la atracción con el ID especificado.' + CHAR(13);
+    IF EXISTS (SELECT 1 FROM ventas.LineaVenta WHERE idAtraccion = @idAtraccion)
+        SET @vErrores += '- La atracción posee registros de ventas asociadas y no puede eliminarse.' + CHAR(13);
+
+    IF @vErrores != ''
+    BEGIN
+        RAISERROR(@vErrores, 16, 1);
+        RETURN;
+    END
+
+    DELETE FROM actividades.Atraccion WHERE idAtraccion = @idAtraccion;
+END
+GO
+
+-- ==================
+-- ATRACCION - OBTENER POR ID
+-- ==================
+CREATE OR ALTER PROCEDURE actividades.Atraccion_ObtenerPorId
+    @idAtraccion INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT * FROM actividades.Atraccion WHERE idAtraccion = @idAtraccion;
+END
+GO
+
+-- ==================
+-- ASIGNACION GUIA - INSERTAR
+-- ==================
+CREATE OR ALTER PROCEDURE personal.AsignacionGuia_Insertar
+    @idTour      INT,
+    @dniGuia     INT,
+    @fechaInicio DATE,
+    @fechaFin    DATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @vErrores VARCHAR(600) = '';
+    DECLARE @vVigenciaAutorizacion DATE;
+
+    IF NOT EXISTS (SELECT 1 FROM actividades.Tour WHERE idTour = @idTour)
+        SET @vErrores += '- El Tour especificado no existe.' + CHAR(13);
+
+    SELECT @vVigenciaAutorizacion = vigenciaAutorizacion FROM personal.Guia WHERE dni = @dniGuia;
+    IF @vVigenciaAutorizacion IS NULL
+        SET @vErrores += '- El Guía especificado no existe.' + CHAR(13);
+
+    IF @fechaInicio IS NULL OR @fechaFin IS NULL
+        SET @vErrores += '- Las fechas de inicio y fin son obligatorias.' + CHAR(13);
+    IF @fechaInicio IS NOT NULL AND @fechaFin IS NOT NULL AND @fechaInicio > @fechaFin
+        SET @vErrores += '- La fecha de inicio no puede ser posterior a la fecha de fin.' + CHAR(13);
+
+    -- Validaciones de negocio que dependen de las anteriores (se acumulan igual, sin frenar antes)
+    IF @vVigenciaAutorizacion IS NOT NULL AND @fechaFin IS NOT NULL AND @vVigenciaAutorizacion < @fechaFin
+        SET @vErrores += '- La autorización del guía vence antes de la fecha de finalización del tour.' + CHAR(13);
+
+    IF @dniGuia IS NOT NULL AND @fechaInicio IS NOT NULL AND @fechaFin IS NOT NULL AND EXISTS (
+        SELECT 1 FROM personal.AsignacionGuia
+        WHERE dniGuia = @dniGuia
+          AND @fechaInicio <= fechaFin
+          AND @fechaFin >= fechaInicio
+    )
+        SET @vErrores += '- El guía ya cuenta con un tour asignado en el rango de fechas solicitado.' + CHAR(13);
+
+    IF @vErrores != ''
+    BEGIN
+        RAISERROR(@vErrores, 16, 1);
+        RETURN;
+    END
+
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        INSERT INTO personal.AsignacionGuia (idTour, dniGuia, fechaInicio, fechaFin)
+        VALUES (@idTour, @dniGuia, @fechaInicio, @fechaFin);
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END
+GO
+
+-- ==================
+-- ASIGNACION GUIA - ELIMINAR
+-- ==================
+CREATE OR ALTER PROCEDURE personal.AsignacionGuia_Eliminar
+    @idAsignacion INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    IF NOT EXISTS (SELECT 1 FROM personal.AsignacionGuia WHERE idAsignacion = @idAsignacion)
+    BEGIN
+        RAISERROR('- No existe la asignación especificada.', 16, 1);
+        RETURN;
+    END
+
+    DELETE FROM personal.AsignacionGuia WHERE idAsignacion = @idAsignacion;
+END
+GO
+
+-- ==================
+-- ASIGNACION GUIA - OBTENER POR ID
+-- ==================
+CREATE OR ALTER PROCEDURE personal.AsignacionGuia_ObtenerPorId
+    @idAsignacion INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT * FROM personal.AsignacionGuia WHERE idAsignacion = @idAsignacion;
+END
+GO
+-- =============================================
+-- Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Grupo: 03
+-- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
+-- Fecha: 15/06/2026
+-- Descripcion: Stored Procedures de ABM para el modulo Concesiones.
 --              SPs: TipoDeConsesion (Insertar/Eliminar/Actualizar)
 --                   Empresa         (Insertar/Eliminar/Actualizar)
 --                   Concesion       (Insertar/Eliminar/Actualizar)
 --                   PagoConcesion   (Insertar/Eliminar/Actualizar)
 -- Notas: Ninguna operacion accede directamente a las tablas.
 --        Cada SP reune todos los errores en un unico mensaje.
+-- =============================================
 
+USE ParquesNacionales;
 GO
 
+-- ============================================================
 -- TIPO DE CONCESION
+-- ============================================================
 
-CREATE OR ALTER PROCEDURE parques.sp_TipoConsesion_Insertar
+CREATE OR ALTER PROCEDURE concesiones.TipoConsesion_Insertar
     @descripcion VARCHAR(100)
 AS
 BEGIN
@@ -1039,7 +1666,7 @@ BEGIN
     IF @descripcion IS NULL OR LTRIM(RTRIM(@descripcion)) = ''
         SET @vErrores += '- La descripcion del tipo de concesion es obligatoria.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.TipoDeConsesion
+    IF EXISTS (SELECT 1 FROM concesiones.TipoDeConsesion
                WHERE descripcion = LTRIM(RTRIM(@descripcion)))
         SET @vErrores += '- Ya existe un tipo de concesion con esa descripcion.' + CHAR(13);
 
@@ -1049,25 +1676,25 @@ BEGIN
         RETURN;
     END
 
-    INSERT INTO parques.TipoDeConsesion (descripcion)
+    INSERT INTO concesiones.TipoDeConsesion (descripcion)
     VALUES (LTRIM(RTRIM(@descripcion)));
 
     PRINT 'Tipo de concesion creado con ID: ' + CAST(SCOPE_IDENTITY() AS VARCHAR);
 END
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_TipoConsesion_Eliminar
+CREATE OR ALTER PROCEDURE concesiones.TipoConsesion_Eliminar
     @idTipoConcesion INT
 AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.TipoDeConsesion
+    IF NOT EXISTS (SELECT 1 FROM concesiones.TipoDeConsesion
                    WHERE idTipoConcesion = @idTipoConcesion)
         SET @vErrores += '- No existe un tipo de concesion con el ID indicado.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.Concesion
+    IF EXISTS (SELECT 1 FROM concesiones.Concesion
                WHERE idTipoConcesion = @idTipoConcesion)
         SET @vErrores += '- No se puede eliminar: existen concesiones asociadas a este tipo.' + CHAR(13);
 
@@ -1077,12 +1704,12 @@ BEGIN
         RETURN;
     END
 
-    DELETE FROM parques.TipoDeConsesion WHERE idTipoConcesion = @idTipoConcesion;
+    DELETE FROM concesiones.TipoDeConsesion WHERE idTipoConcesion = @idTipoConcesion;
     PRINT 'Tipo de concesion eliminado.';
 END
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_TipoConsesion_Actualizar
+CREATE OR ALTER PROCEDURE concesiones.TipoConsesion_Actualizar
     @idTipoConcesion INT,
     @descripcion     VARCHAR(100)
 AS
@@ -1090,14 +1717,14 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.TipoDeConsesion
+    IF NOT EXISTS (SELECT 1 FROM concesiones.TipoDeConsesion
                    WHERE idTipoConcesion = @idTipoConcesion)
         SET @vErrores += '- No existe un tipo de concesion con el ID indicado.' + CHAR(13);
 
     IF @descripcion IS NULL OR LTRIM(RTRIM(@descripcion)) = ''
         SET @vErrores += '- La descripcion es obligatoria.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.TipoDeConsesion
+    IF EXISTS (SELECT 1 FROM concesiones.TipoDeConsesion
                WHERE descripcion = LTRIM(RTRIM(@descripcion))
                  AND idTipoConcesion != @idTipoConcesion)
         SET @vErrores += '- Ya existe otro tipo de concesion con esa descripcion.' + CHAR(13);
@@ -1108,7 +1735,7 @@ BEGIN
         RETURN;
     END
 
-    UPDATE parques.TipoDeConsesion
+    UPDATE concesiones.TipoDeConsesion
     SET descripcion = LTRIM(RTRIM(@descripcion))
     WHERE idTipoConcesion = @idTipoConcesion;
 
@@ -1116,9 +1743,11 @@ BEGIN
 END
 GO
 
+-- ============================================================
 -- EMPRESA
+-- ============================================================
 
-CREATE OR ALTER PROCEDURE parques.sp_Empresa_Insertar
+CREATE OR ALTER PROCEDURE concesiones.Empresa_Insertar
     @razonSocial  VARCHAR(200),
     @cuit         VARCHAR(20),
     @contacto     VARCHAR(100) = NULL,
@@ -1139,7 +1768,7 @@ BEGIN
         IF LEN(LTRIM(RTRIM(@cuit))) != 11
             SET @vErrores += '- El CUIT debe tener exactamente 11 digitos.' + CHAR(13);
 
-        IF EXISTS (SELECT 1 FROM parques.Empresa
+        IF EXISTS (SELECT 1 FROM concesiones.Empresa
                    WHERE cuit = LTRIM(RTRIM(@cuit)))
             SET @vErrores += '- Ya existe una empresa registrada con ese CUIT.' + CHAR(13);
     END
@@ -1153,25 +1782,25 @@ BEGIN
         RETURN;
     END
 
-    INSERT INTO parques.Empresa (razonSocial, cuit, contacto, email, telefono)
+    INSERT INTO concesiones.Empresa (razonSocial, cuit, contacto, email, telefono)
     VALUES (LTRIM(RTRIM(@razonSocial)), LTRIM(RTRIM(@cuit)), @contacto, @email, @telefono);
 
     PRINT 'Empresa registrada con ID: ' + CAST(SCOPE_IDENTITY() AS VARCHAR);
 END
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_Empresa_Eliminar
+CREATE OR ALTER PROCEDURE concesiones.Empresa_Eliminar
     @idEmpresa INT
 AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Empresa
+    IF NOT EXISTS (SELECT 1 FROM concesiones.Empresa
                    WHERE idEmpresa = @idEmpresa)
         SET @vErrores += '- No existe una empresa con el ID indicado.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.Concesion
+    IF EXISTS (SELECT 1 FROM concesiones.Concesion
                WHERE idEmpresa = @idEmpresa)
         SET @vErrores += '- No se puede eliminar la empresa: tiene concesiones registradas.' + CHAR(13);
 
@@ -1181,12 +1810,12 @@ BEGIN
         RETURN;
     END
 
-    DELETE FROM parques.Empresa WHERE idEmpresa = @idEmpresa;
+    DELETE FROM concesiones.Empresa WHERE idEmpresa = @idEmpresa;
     PRINT 'Empresa eliminada.';
 END
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_Empresa_Actualizar
+CREATE OR ALTER PROCEDURE concesiones.Empresa_Actualizar
     @idEmpresa    INT,
     @razonSocial  VARCHAR(200),
     @cuit         VARCHAR(20),
@@ -1198,7 +1827,7 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Empresa
+    IF NOT EXISTS (SELECT 1 FROM concesiones.Empresa
                    WHERE idEmpresa = @idEmpresa)
         SET @vErrores += '- No existe una empresa con el ID indicado.' + CHAR(13);
 
@@ -1212,7 +1841,7 @@ BEGIN
         IF LEN(LTRIM(RTRIM(@cuit))) != 11
             SET @vErrores += '- El CUIT debe tener exactamente 11 digitos.' + CHAR(13);
 
-        IF EXISTS (SELECT 1 FROM parques.Empresa
+        IF EXISTS (SELECT 1 FROM concesiones.Empresa
                    WHERE cuit = LTRIM(RTRIM(@cuit))
                      AND idEmpresa != @idEmpresa)
             SET @vErrores += '- Ya existe otra empresa registrada con ese CUIT.' + CHAR(13);
@@ -1227,7 +1856,7 @@ BEGIN
         RETURN;
     END
 
-    UPDATE parques.Empresa
+    UPDATE concesiones.Empresa
     SET razonSocial = LTRIM(RTRIM(@razonSocial)),
         cuit        = LTRIM(RTRIM(@cuit)),
         contacto    = @contacto,
@@ -1239,9 +1868,11 @@ BEGIN
 END
 GO
 
+-- ============================================================
 -- CONCESION
+-- ============================================================
 
-CREATE OR ALTER PROCEDURE parques.sp_Concesion_Insertar
+CREATE OR ALTER PROCEDURE concesiones.Concesion_Insertar
     @descripcion     VARCHAR(100),
     @idTipoConcesion INT,
     @idParque        INT,
@@ -1257,11 +1888,11 @@ BEGIN
     IF @descripcion IS NULL OR LTRIM(RTRIM(@descripcion)) = ''
         SET @vErrores += '- La descripcion es obligatoria.' + CHAR(13);
 
-    IF NOT EXISTS (SELECT 1 FROM parques.TipoDeConsesion
+    IF NOT EXISTS (SELECT 1 FROM concesiones.TipoDeConsesion
                    WHERE idTipoConcesion = @idTipoConcesion)
         SET @vErrores += '- El tipo de concesion indicado no existe.' + CHAR(13);
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Empresa
+    IF NOT EXISTS (SELECT 1 FROM concesiones.Empresa
                    WHERE idEmpresa = @idEmpresa)
         SET @vErrores += '- La empresa indicada no existe.' + CHAR(13);
 
@@ -1281,7 +1912,7 @@ BEGIN
         RETURN;
     END
 
-    INSERT INTO parques.Concesion
+    INSERT INTO concesiones.Concesion
         (descripcion, idTipoConcesion, idParque, idEmpresa, fechaInicio, fechaFin, canonMensual)
     VALUES
         (@descripcion, @idTipoConcesion, @idParque, @idEmpresa, @fechaInicio, @fechaFin, @canonMensual);
@@ -1290,18 +1921,18 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_Concesion_Eliminar
+CREATE OR ALTER PROCEDURE concesiones.Concesion_Eliminar
     @idConcesion INT
 AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Concesion
+    IF NOT EXISTS (SELECT 1 FROM concesiones.Concesion
                    WHERE idConcesion = @idConcesion)
         SET @vErrores += '- No existe una concesion con el ID indicado.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.PagoConcesion
+    IF EXISTS (SELECT 1 FROM concesiones.PagoConcesion
                WHERE idConcesion = @idConcesion)
         SET @vErrores += '- No se puede eliminar la concesion: tiene pagos de canon registrados.' + CHAR(13);
 
@@ -1311,12 +1942,12 @@ BEGIN
         RETURN;
     END
 
-    DELETE FROM parques.Concesion WHERE idConcesion = @idConcesion;
+    DELETE FROM concesiones.Concesion WHERE idConcesion = @idConcesion;
     PRINT 'Concesion eliminada.';
 END
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_Concesion_Actualizar
+CREATE OR ALTER PROCEDURE concesiones.Concesion_Actualizar
     @idConcesion     INT,
     @descripcion     VARCHAR(100),
     @idTipoConcesion INT,
@@ -1330,18 +1961,18 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Concesion
+    IF NOT EXISTS (SELECT 1 FROM concesiones.Concesion
                    WHERE idConcesion = @idConcesion)
         SET @vErrores += '- No existe una concesion con el ID indicado.' + CHAR(13);
 
     IF @descripcion IS NULL OR LTRIM(RTRIM(@descripcion)) = ''
         SET @vErrores += '- La descripcion es obligatoria.' + CHAR(13);
 
-    IF NOT EXISTS (SELECT 1 FROM parques.TipoDeConsesion
+    IF NOT EXISTS (SELECT 1 FROM concesiones.TipoDeConsesion
                    WHERE idTipoConcesion = @idTipoConcesion)
         SET @vErrores += '- El tipo de concesion indicado no existe.' + CHAR(13);
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Empresa
+    IF NOT EXISTS (SELECT 1 FROM concesiones.Empresa
                    WHERE idEmpresa = @idEmpresa)
         SET @vErrores += '- La empresa indicada no existe.' + CHAR(13);
 
@@ -1361,7 +1992,7 @@ BEGIN
         RETURN;
     END
 
-    UPDATE parques.Concesion
+    UPDATE concesiones.Concesion
     SET descripcion     = @descripcion,
         idTipoConcesion = @idTipoConcesion,
         idParque        = @idParque,
@@ -1375,9 +2006,11 @@ BEGIN
 END
 GO
 
+-- ============================================================
 -- PAGO DE CONCESION
+-- ============================================================
 
-CREATE OR ALTER PROCEDURE parques.sp_PagoConcesion_Insertar
+CREATE OR ALTER PROCEDURE concesiones.PagoConcesion_Insertar
     @idConcesion INT,
     @monto       DECIMAL(18,2),
     @fechaPago   DATE,
@@ -1388,7 +2021,7 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Concesion
+    IF NOT EXISTS (SELECT 1 FROM concesiones.Concesion
                    WHERE idConcesion = @idConcesion)
         SET @vErrores += '- No existe una concesion con el ID indicado.' + CHAR(13);
 
@@ -1401,7 +2034,7 @@ BEGIN
     IF @periodoAnio < 2020
         SET @vErrores += '- El anio del periodo no puede ser anterior a 2020.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.PagoConcesion
+    IF EXISTS (SELECT 1 FROM concesiones.PagoConcesion
                WHERE idConcesion = @idConcesion
                  AND periodoAnio = @periodoAnio
                  AND periodoMes  = @periodoMes)
@@ -1413,32 +2046,32 @@ BEGIN
         RETURN;
     END
 
-    INSERT INTO parques.PagoConcesion (idConcesion, monto, fechaPago, periodoAnio, periodoMes)
+    INSERT INTO concesiones.PagoConcesion (idConcesion, monto, fechaPago, periodoAnio, periodoMes)
     VALUES (@idConcesion, @monto, @fechaPago, @periodoAnio, @periodoMes);
 
     PRINT 'Pago de canon registrado con ID: ' + CAST(SCOPE_IDENTITY() AS VARCHAR);
 END
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_PagoConcesion_Eliminar
+CREATE OR ALTER PROCEDURE concesiones.PagoConcesion_Eliminar
     @idPagoConcesion INT
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    IF NOT EXISTS (SELECT 1 FROM parques.PagoConcesion
+    IF NOT EXISTS (SELECT 1 FROM concesiones.PagoConcesion
                    WHERE idPagoConcesion = @idPagoConcesion)
     BEGIN
         RAISERROR('- No existe un pago con el ID indicado.', 16, 1);
         RETURN;
     END
 
-    DELETE FROM parques.PagoConcesion WHERE idPagoConcesion = @idPagoConcesion;
+    DELETE FROM concesiones.PagoConcesion WHERE idPagoConcesion = @idPagoConcesion;
     PRINT 'Pago eliminado.';
 END
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_PagoConcesion_Actualizar
+CREATE OR ALTER PROCEDURE concesiones.PagoConcesion_Actualizar
     @idPagoConcesion INT,
     @monto           DECIMAL(18,2),
     @fechaPago       DATE
@@ -1447,7 +2080,7 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.PagoConcesion
+    IF NOT EXISTS (SELECT 1 FROM concesiones.PagoConcesion
                    WHERE idPagoConcesion = @idPagoConcesion)
         SET @vErrores += '- No existe un pago con el ID indicado.' + CHAR(13);
 
@@ -1460,7 +2093,7 @@ BEGIN
         RETURN;
     END
 
-    UPDATE parques.PagoConcesion
+    UPDATE concesiones.PagoConcesion
     SET monto     = @monto,
         fechaPago = @fechaPago
     WHERE idPagoConcesion = @idPagoConcesion;
@@ -1469,444 +2102,27 @@ BEGIN
 END
 GO
 
-GO
-
-
--- ============================================================
--- ABM - Guías, Tours y Atracciones
--- ============================================================
-
-
-GO
-
--- GUIA - INSERTAR
-CREATE OR ALTER PROCEDURE parques.sp_Guia_Insertar
-    @dni                    INT,
-    @apyn                   VARCHAR(100),
-    @especialidad           VARCHAR(100) = NULL,
-    @titulo                 VARCHAR(100) = NULL,
-    @habilitaciones         VARCHAR(255) = NULL,
-    @vigenciaAutorizacion   DATE
-AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @vErrores VARCHAR(500) = '';
-
-    -- Validaciones
-    IF @dni IS NULL OR @dni <= 0
-        SET @vErrores = @vErrores + '- El DNI es obligatorio y debe ser mayor a 0.' + CHAR(13);
-    IF @apyn IS NULL OR LTRIM(RTRIM(@apyn)) = ''
-        SET @vErrores = @vErrores + '- El nombre y apellido es obligatorio.' + CHAR(13);
-    IF @vigenciaAutorizacion IS NULL
-        SET @vErrores = @vErrores + '- La vigencia de autorización es obligatoria.' + CHAR(13);
-    IF EXISTS (SELECT 1 FROM parques.Guia WHERE dni = @dni)
-        SET @vErrores = @vErrores + '- Ya existe un guía registrado con ese DNI.' + CHAR(13);
-
-    IF @vErrores != ''
-    BEGIN
-        RAISERROR(@vErrores, 16, 1);
-        RETURN;
-    END
-
-    INSERT INTO parques.Guia (dni, apyn, especialidad, titulo, habilitaciones, vigenciaAutorizacion)
-    VALUES (@dni, @apyn, @especialidad, @titulo, @habilitaciones, @vigenciaAutorizacion);
-END
-GO
-
--- GUIA - ACTUALIZAR
-CREATE OR ALTER PROCEDURE parques.sp_Guia_Actualizar
-    @dni                    INT,
-    @especialidad           VARCHAR(100) = NULL,
-    @titulo                 VARCHAR(100) = NULL,
-    @habilitaciones         VARCHAR(255) = NULL,
-    @vigenciaAutorizacion   DATE
-AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @vErrores VARCHAR(500) = '';
-
-    IF NOT EXISTS (SELECT 1 FROM parques.Guia WHERE dni = @dni)
-        SET @vErrores = @vErrores + '- No existe un guía con ese DNI.' + CHAR(13);
-    IF @vigenciaAutorizacion IS NULL
-        SET @vErrores = @vErrores + '- La vigencia de autorización es obligatoria.' + CHAR(13);
-
-    IF @vErrores != ''
-    BEGIN
-        RAISERROR(@vErrores, 16, 1);
-        RETURN;
-    END
-
-    UPDATE parques.Guia
-    SET especialidad = @especialidad,
-        titulo = @titulo,
-        habilitaciones = @habilitaciones,
-        vigenciaAutorizacion = @vigenciaAutorizacion
-    WHERE dni = @dni;
-END
-GO
-
--- GUIA - ELIMINAR
-CREATE OR ALTER PROCEDURE parques.sp_Guia_Eliminar
-    @dni INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @vErrores VARCHAR(500) = '';
-
-    IF NOT EXISTS (SELECT 1 FROM parques.Guia WHERE dni = @dni)
-        SET @vErrores = @vErrores + '- No existe un guía con ese DNI.' + CHAR(13);
-    IF EXISTS (SELECT 1 FROM parques.AsignacionGuia WHERE dniGuia = @dni)
-        SET @vErrores = @vErrores + '- El guía tiene tours asignados y no puede eliminarse.' + CHAR(13);
-
-    IF @vErrores != ''
-    BEGIN
-        RAISERROR(@vErrores, 16, 1);
-        RETURN;
-    END
-
-    DELETE FROM parques.Guia WHERE dni = @dni;
-END
-GO
-
--- GUIA - OBTENER POR ID
-CREATE OR ALTER PROCEDURE parques.sp_Guia_ObtenerPorId
-    @dni INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SELECT * FROM parques.Guia WHERE dni = @dni;
-END
-GO
-
--- TOUR - INSERTAR
-CREATE OR ALTER PROCEDURE parques.sp_Tour_Insertar
-    @nombre      VARCHAR(100),
-    @descripcion VARCHAR(255) = NULL,
-    @duracion    INT,
-    @cupoMaximo  INT,
-    @precio      DECIMAL(18,2),
-    @idParque    INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @vErrores VARCHAR(500) = '';
-
-    -- Validaciones
-    IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
-        SET @vErrores = @vErrores + '- El nombre del tour es obligatorio.' + CHAR(13);
-    IF @duracion IS NULL OR @duracion <= 0
-        SET @vErrores = @vErrores + '- La duración debe ser mayor a 0 minutos.' + CHAR(13);
-    IF @cupoMaximo IS NULL OR @cupoMaximo <= 0
-        SET @vErrores = @vErrores + '- El cupo máximo debe ser mayor a 0.' + CHAR(13);
-    IF @precio IS NULL OR @precio < 0
-        SET @vErrores = @vErrores + '- El precio no puede ser negativo.' + CHAR(13);
-    IF NOT EXISTS (SELECT 1 FROM parques.Parque WHERE idParque = @idParque)
-        SET @vErrores = @vErrores + '- El parque especificado no existe.' + CHAR(13);
-
-    IF @vErrores != ''
-    BEGIN
-        RAISERROR(@vErrores, 16, 1);
-        RETURN;
-    END
-
-    INSERT INTO parques.Tour (nombre, descripcion, duracion, cupoMaximo, precio, idParque)
-    VALUES (@nombre, @descripcion, @duracion, @cupoMaximo, @precio, @idParque);
-END;
-GO
-
--- TOUR - ACTUALIZAR
-CREATE OR ALTER PROCEDURE parques.sp_Tour_Actualizar
-    @idTour      INT,
-    @nombre      VARCHAR(100),
-    @descripcion VARCHAR(255) = NULL,
-    @duracion    INT,
-    @cupoMaximo  INT,
-    @precio      DECIMAL(18,2)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @vErrores VARCHAR(500) = '';
-
-    IF NOT EXISTS (SELECT 1 FROM parques.Tour WHERE idTour = @idTour)
-        SET @vErrores = @vErrores + '- No existe un tour con el ID especificado.' + CHAR(13);
-    IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
-        SET @vErrores = @vErrores + '- El nombre del tour es obligatorio.' + CHAR(13);
-    IF @duracion IS NULL OR @duracion <= 0
-        SET @vErrores = @vErrores + '- La duración debe ser mayor a 0 minutos.' + CHAR(13);
-    IF @cupoMaximo IS NULL OR @cupoMaximo <= 0
-        SET @vErrores = @vErrores + '- El cupo máximo debe ser mayor a 0.' + CHAR(13);
-    IF @precio IS NULL OR @precio < 0
-        SET @vErrores = @vErrores + '- El precio no puede ser negativo.' + CHAR(13);
-
-    IF @vErrores != ''
-    BEGIN
-        RAISERROR(@vErrores, 16, 1);
-        RETURN;
-    END
-
-    UPDATE parques.Tour
-    SET nombre = @nombre,
-        descripcion = @descripcion,
-        duracion = @duracion,
-        cupoMaximo = @cupoMaximo,
-        precio = @precio
-    WHERE idTour = @idTour;
-END;
-GO
-
--- TOUR - ELIMINAR
-CREATE OR ALTER PROCEDURE parques.sp_Tour_Eliminar
-    @idTour INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @vErrores VARCHAR(500) = '';
-
-    IF NOT EXISTS (SELECT 1 FROM parques.Tour WHERE idTour = @idTour)
-        SET @vErrores = @vErrores + '- No existe el tour con el ID especificado.' + CHAR(13);
-    
-    -- Validar integridad si ya se vendió (Línea Venta) o si tiene guías asignados
-    IF EXISTS (SELECT 1 FROM parques.AsignacionGuia WHERE idTour = @idTour)
-        SET @vErrores = @vErrores + '- El tour tiene un historial de guías asignados y no puede eliminarse.' + CHAR(13);
-    IF EXISTS (SELECT 1 FROM parques.LineaVenta WHERE idTour = @idTour)
-        SET @vErrores = @vErrores + '- El tour posee registros de ventas asociadas y no puede eliminarse.' + CHAR(13);
-
-    IF @vErrores != ''
-    BEGIN
-        RAISERROR(@vErrores, 16, 1);
-        RETURN;
-    END
-
-    DELETE FROM parques.Tour WHERE idTour = @idTour;
-END;
-GO
-
--- TOUR - OBTENER POR ID
-CREATE OR ALTER PROCEDURE parques.sp_Tour_ObtenerPorId
-    @idTour INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SELECT * FROM parques.Tour WHERE idTour = @idTour;
-END;
-GO
-
--- ATRACCION - INSERTAR
-CREATE OR ALTER PROCEDURE parques.sp_Atraccion_Insertar
-    @nombre      VARCHAR(100),
-    @descripcion VARCHAR(255) = NULL,
-    @tipo        VARCHAR(50) = NULL,
-    @precio      DECIMAL(18,2),
-    @duracion    INT,
-    @cupoMaximo  INT,
-    @idParque    INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @vErrores VARCHAR(500) = '';
-
-    IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
-        SET @vErrores = @vErrores + '- El nombre de la atracción es obligatorio.' + CHAR(13);
-    IF @duracion IS NULL OR @duracion <= 0
-        SET @vErrores = @vErrores + '- La duración debe ser mayor a 0 minutos.' + CHAR(13);
-    IF @cupoMaximo IS NULL OR @cupoMaximo <= 0
-        SET @vErrores = @vErrores + '- El cupo máximo debe ser mayor a 0.' + CHAR(13);
-    IF @precio IS NULL OR @precio < 0
-        SET @vErrores = @vErrores + '- El precio no puede ser negativo.' + CHAR(13);
-    IF NOT EXISTS (SELECT 1 FROM parques.Parque WHERE idParque = @idParque)
-        SET @vErrores = @vErrores + '- El parque especificado no existe.' + CHAR(13);
-
-    IF @vErrores != ''
-    BEGIN
-        RAISERROR(@vErrores, 16, 1);
-        RETURN;
-    END
-
-    INSERT INTO parques.Atraccion (nombre, descripcion, tipo, precio, duracion, cupoMaximo, idParque)
-    VALUES (@nombre, @descripcion, @tipo, @precio, @duracion, @cupoMaximo, @idParque);
-END;
-GO
-
--- ATRACCION - ACTUALIZAR
-CREATE OR ALTER PROCEDURE parques.sp_Atraccion_Actualizar
-    @idAtraccion INT,
-    @nombre      VARCHAR(100),
-    @descripcion VARCHAR(255) = NULL,
-    @tipo        VARCHAR(50) = NULL,
-    @precio      DECIMAL(18,2),
-    @duracion    INT,
-    @cupoMaximo  INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @vErrores VARCHAR(500) = '';
-
-    IF NOT EXISTS (SELECT 1 FROM parques.Atraccion WHERE idAtraccion = @idAtraccion)
-        SET @vErrores = @vErrores + '- No existe la atracción con el ID especificado.' + CHAR(13);
-    IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
-        SET @vErrores = @vErrores + '- El nombre es obligatorio.' + CHAR(13);
-    IF @duracion IS NULL OR @duracion <= 0
-        SET @vErrores = @vErrores + '- La duración debe ser mayor a 0.' + CHAR(13);
-    IF @cupoMaximo IS NULL OR @cupoMaximo <= 0
-        SET @vErrores = @vErrores + '- El cupo máximo debe ser mayor a 0.' + CHAR(13);
-    IF @precio IS NULL OR @precio < 0
-        SET @vErrores = @vErrores + '- El precio no puede ser negativo.' + CHAR(13);
-
-    IF @vErrores != ''
-    BEGIN
-        RAISERROR(@vErrores, 16, 1);
-        RETURN;
-    END
-
-    UPDATE parques.Atraccion
-    SET nombre = @nombre,
-        descripcion = @descripcion,
-        tipo = @tipo,
-        precio = @precio,
-        duracion = @duracion,
-        cupoMaximo = @cupoMaximo
-    WHERE idAtraccion = @idAtraccion;
-END;
-GO
-
--- ATRACCION - ELIMINAR
-CREATE OR ALTER PROCEDURE parques.sp_Atraccion_Eliminar
-    @idAtraccion INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @vErrores VARCHAR(500) = '';
-
-    IF NOT EXISTS (SELECT 1 FROM parques.Atraccion WHERE idAtraccion = @idAtraccion)
-        SET @vErrores = @vErrores + '- No existe la atracción con el ID especificado.' + CHAR(13);
-    IF EXISTS (SELECT 1 FROM parques.LineaVenta WHERE idAtraccion = @idAtraccion)
-        SET @vErrores = @vErrores + '- La atracción posee registros de ventas asociadas y no puede eliminarse.' + CHAR(13);
-
-    IF @vErrores != ''
-    BEGIN
-        RAISERROR(@vErrores, 16, 1);
-        RETURN;
-    END
-
-    DELETE FROM parques.Atraccion WHERE idAtraccion = @idAtraccion;
-END;
-GO
-
--- ATRACCION - OBTENER POR ID
-CREATE OR ALTER PROCEDURE parques.sp_Atraccion_ObtenerPorId
-    @idAtraccion INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SELECT * FROM parques.Atraccion WHERE idAtraccion = @idAtraccion;
-END;
-GO
-
--- ASIGNACION GUIA - INSERTAR (NEGOCIO)
-CREATE OR ALTER PROCEDURE parques.sp_AsignacionGuia_Insertar
-    @idTour      INT,
-    @dniGuia     INT,
-    @fechaInicio DATE,
-    @fechaFin    DATE
-AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @vErrores VARCHAR(600) = '';
-    DECLARE @vVigenciaAutorizacion DATE;
-
-    -- 1. Validaciones básicas de existencia y coherencia de fechas
-    IF NOT EXISTS (SELECT 1 FROM parques.Tour WHERE idTour = @idTour)
-        SET @vErrores = @vErrores + '- El Tour especificado no existe.' + CHAR(13);
-    
-    SELECT @vVigenciaAutorizacion = vigenciaAutorizacion FROM parques.Guia WHERE dni = @dniGuia;
-    IF @vVigenciaAutorizacion IS NULL
-        SET @vErrores = @vErrores + '- El Guía especificado no existe.' + CHAR(13);
-        
-    IF @fechaInicio IS NULL OR @fechaFin IS NULL
-        SET @vErrores = @vErrores + '- Las fechas de inicio y fin son obligatorias.' + CHAR(13);
-    IF @fechaInicio > @fechaFin
-        SET @vErrores = @vErrores + '- La fecha de inicio no puede ser posterior a la fecha de fin.' + CHAR(13);
-
-    -- Si las validaciones básicas fallan, frena acá para evitar errores lógicos más adelante
-    IF @vErrores != ''
-    BEGIN
-        RAISERROR(@vErrores, 16, 1);
-        RETURN;
-    END
-
-    -- 2. Regla de Negocio: Validar vigencia de autorización del guía
-    -- La habilitación debe cubrir todo el rango del tour (hasta la fecha fin)
-    IF @vVigenciaAutorizacion < @fechaFin
-        SET @vErrores = @vErrores + '- La autorización del guía vence antes de la fecha de finalización del tour.' + CHAR(13);
-
-    -- 3. Regla de Negocio: Validar superposición de fechas (Overlap)
-    -- Hay superposición si: (InicioNuevo <= FinExistente) AND (FinNuevo >= InicioExistente)
-    IF EXISTS (
-        SELECT 1 FROM parques.AsignacionGuia
-        WHERE dniGuia = @dniGuia
-          AND @fechaInicio <= fechaFin
-          AND @fechaFin >= fechaInicio
-    )
-    BEGIN
-        SET @vErrores = @vErrores + '- El guía ya cuenta con un tour asignado en el rango de fechas solicitado.' + CHAR(13);
-    END
-
-    -- Despacho final de errores acumulados de negocio
-    IF @vErrores != ''
-    BEGIN
-        RAISERROR(@vErrores, 16, 1);
-        RETURN;
-    END
-
-    -- Si pasó todo perfectamente, inserta
-    INSERT INTO parques.AsignacionGuia (idTour, dniGuia, fechaInicio, fechaFin)
-    VALUES (@idTour, @dniGuia, @fechaInicio, @fechaFin);
-END;
-GO
-
--- ASIGNACION GUIA - ELIMINAR
-CREATE OR ALTER PROCEDURE parques.sp_AsignacionGuia_Eliminar
-    @idAsignacion INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    IF NOT EXISTS (SELECT 1 FROM parques.AsignacionGuia WHERE idAsignacion = @idAsignacion)
-    BEGIN
-        RAISERROR('- No existe la asignación especificada.', 16, 1);
-        RETURN;
-    END
-
-    DELETE FROM parques.AsignacionGuia WHERE idAsignacion = @idAsignacion;
-END;
-GO
-
--- ASIGNACION GUIA - OBTENER POR ID
-CREATE OR ALTER PROCEDURE parques.sp_AsignacionGuia_ObtenerPorId
-    @idAsignacion INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SELECT * FROM parques.AsignacionGuia WHERE idAsignacion = @idAsignacion;
-END;
-GO
-
-GO
-
-
--- ============================================================
--- ABM - Ventas
--- ============================================================
-
+-- =============================================
+-- Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Grupo: 03
+-- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
+-- Fecha: 15/06/2026
+-- Descripcion: Stored Procedures de ABM para el modulo Ventas y Precios.
 --              SPs: TipoVisitante (Insertar/Eliminar/Actualizar)
 --                   PrecioEntrada (Insertar/Eliminar/Actualizar)
 --                   TicketVenta   (Insertar/Eliminar/Actualizar)
 --                   LineaVenta    (Insertar/Eliminar/Actualizar)
+-- =============================================
 
+USE ParquesNacionales;
 GO
 
+-- ============================================================
 -- TIPO VISITANTE
+-- ============================================================
 
-CREATE OR ALTER PROCEDURE parques.sp_TipoVisitante_Insertar
+CREATE OR ALTER PROCEDURE ventas.TipoVisitante_Insertar
     @descripcion VARCHAR(100)
 AS
 BEGIN
@@ -1916,7 +2132,7 @@ BEGIN
     IF @descripcion IS NULL OR LTRIM(RTRIM(@descripcion)) = ''
         SET @vErrores += '- La descripcion del tipo de visitante es obligatoria.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.TipoVisitante
+    IF EXISTS (SELECT 1 FROM ventas.TipoVisitante
                WHERE descripcion = LTRIM(RTRIM(@descripcion)))
         SET @vErrores += '- Ya existe un tipo de visitante con esa descripcion.' + CHAR(13);
 
@@ -1926,25 +2142,25 @@ BEGIN
         RETURN;
     END
 
-    INSERT INTO parques.TipoVisitante (descripcion)
+    INSERT INTO ventas.TipoVisitante (descripcion)
     VALUES (LTRIM(RTRIM(@descripcion)));
 
     PRINT 'Tipo de visitante creado con ID: ' + CAST(SCOPE_IDENTITY() AS VARCHAR);
 END
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_TipoVisitante_Eliminar
+CREATE OR ALTER PROCEDURE ventas.TipoVisitante_Eliminar
     @idTipoVisitante INT
 AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.TipoVisitante
+    IF NOT EXISTS (SELECT 1 FROM ventas.TipoVisitante
                    WHERE idTipoVisitante = @idTipoVisitante)
         SET @vErrores += '- No existe un tipo de visitante con el ID indicado.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.PrecioEntrada
+    IF EXISTS (SELECT 1 FROM ventas.PrecioEntrada
                WHERE idTipoVisitante = @idTipoVisitante)
         SET @vErrores += '- No se puede eliminar: existen precios asociados a este tipo de visitante.' + CHAR(13);
 
@@ -1954,14 +2170,14 @@ BEGIN
         RETURN;
     END
 
-    DELETE FROM parques.TipoVisitante
+    DELETE FROM ventas.TipoVisitante
     WHERE idTipoVisitante = @idTipoVisitante;
 
     PRINT 'Tipo de visitante eliminado.';
 END
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_TipoVisitante_Actualizar
+CREATE OR ALTER PROCEDURE ventas.TipoVisitante_Actualizar
     @idTipoVisitante INT,
     @descripcion     VARCHAR(100)
 AS
@@ -1969,14 +2185,14 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.TipoVisitante
+    IF NOT EXISTS (SELECT 1 FROM ventas.TipoVisitante
                    WHERE idTipoVisitante = @idTipoVisitante)
         SET @vErrores += '- No existe un tipo de visitante con el ID indicado.' + CHAR(13);
 
     IF @descripcion IS NULL OR LTRIM(RTRIM(@descripcion)) = ''
         SET @vErrores += '- La descripcion es obligatoria.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.TipoVisitante
+    IF EXISTS (SELECT 1 FROM ventas.TipoVisitante
                WHERE descripcion = LTRIM(RTRIM(@descripcion))
                  AND idTipoVisitante != @idTipoVisitante)
         SET @vErrores += '- Ya existe otro tipo de visitante con esa descripcion.' + CHAR(13);
@@ -1987,7 +2203,7 @@ BEGIN
         RETURN;
     END
 
-    UPDATE parques.TipoVisitante
+    UPDATE ventas.TipoVisitante
     SET descripcion = LTRIM(RTRIM(@descripcion))
     WHERE idTipoVisitante = @idTipoVisitante;
 
@@ -1995,9 +2211,11 @@ BEGIN
 END
 GO
 
+-- ============================================================
 -- PRECIO ENTRADA
+-- ============================================================
 
-CREATE OR ALTER PROCEDURE parques.sp_PrecioEntrada_Insertar
+CREATE OR ALTER PROCEDURE ventas.PrecioEntrada_Insertar
     @fechaActualizacion DATE,
     @valor              DECIMAL(18,2),
     @idParque           INT,
@@ -2018,7 +2236,7 @@ BEGIN
                    WHERE idParque = @idParque)
         SET @vErrores += '- El parque indicado no existe.' + CHAR(13);
 
-    IF NOT EXISTS (SELECT 1 FROM parques.TipoVisitante
+    IF NOT EXISTS (SELECT 1 FROM ventas.TipoVisitante
                    WHERE idTipoVisitante = @idTipoVisitante)
         SET @vErrores += '- El tipo de visitante indicado no existe.' + CHAR(13);
 
@@ -2027,7 +2245,7 @@ BEGIN
 
     IF EXISTS (
            SELECT 1
-           FROM parques.PrecioEntrada
+           FROM ventas.PrecioEntrada
            WHERE idParque = @idParque
              AND idTipoVisitante = @idTipoVisitante
              AND fechaHasta IS NULL
@@ -2040,7 +2258,7 @@ BEGIN
         RETURN;
     END
 
-    INSERT INTO parques.PrecioEntrada
+    INSERT INTO ventas.PrecioEntrada
         (fechaActualizacion, valor, idParque, idTipoVisitante, fechaHasta)
     VALUES
         (@fechaActualizacion, @valor, @idParque, @idTipoVisitante, NULL);
@@ -2049,18 +2267,18 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_PrecioEntrada_Eliminar
+CREATE OR ALTER PROCEDURE ventas.PrecioEntrada_Eliminar
     @idPrecio INT
 AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.PrecioEntrada
+    IF NOT EXISTS (SELECT 1 FROM ventas.PrecioEntrada
                    WHERE idPrecio = @idPrecio)
         SET @vErrores += '- No existe un precio de entrada con el ID indicado.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.LineaVenta
+    IF EXISTS (SELECT 1 FROM ventas.LineaVenta
                WHERE idPrecioEntrada = @idPrecio)
         SET @vErrores += '- No se puede eliminar: existen lineas de venta asociadas a este precio.' + CHAR(13);
 
@@ -2070,14 +2288,14 @@ BEGIN
         RETURN;
     END
 
-    DELETE FROM parques.PrecioEntrada
+    DELETE FROM ventas.PrecioEntrada
     WHERE idPrecio = @idPrecio;
 
     PRINT 'Precio de entrada eliminado.';
 END
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_PrecioEntrada_Actualizar
+CREATE OR ALTER PROCEDURE ventas.PrecioEntrada_Actualizar
     @idPrecio           INT,
     @fechaActualizacion DATE,
     @valor              DECIMAL(18,2),
@@ -2089,7 +2307,7 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.PrecioEntrada
+    IF NOT EXISTS (SELECT 1 FROM ventas.PrecioEntrada
                    WHERE idPrecio = @idPrecio)
         SET @vErrores += '- No existe un precio de entrada con el ID indicado.' + CHAR(13);
 
@@ -2103,7 +2321,7 @@ BEGIN
                    WHERE idParque = @idParque)
         SET @vErrores += '- El parque indicado no existe.' + CHAR(13);
 
-    IF NOT EXISTS (SELECT 1 FROM parques.TipoVisitante
+    IF NOT EXISTS (SELECT 1 FROM ventas.TipoVisitante
                    WHERE idTipoVisitante = @idTipoVisitante)
         SET @vErrores += '- El tipo de visitante indicado no existe.' + CHAR(13);
 
@@ -2116,7 +2334,7 @@ BEGIN
         RETURN;
     END
 
-    UPDATE parques.PrecioEntrada
+    UPDATE ventas.PrecioEntrada
     SET fechaActualizacion = @fechaActualizacion,
         valor              = @valor,
         idParque           = @idParque,
@@ -2128,9 +2346,11 @@ BEGIN
 END
 GO
 
+-- ============================================================
 -- TICKET VENTA
+-- ============================================================
 
-CREATE OR ALTER PROCEDURE parques.sp_TicketVenta_Insertar
+CREATE OR ALTER PROCEDURE ventas.TicketVenta_Insertar
     @fechaHora    DATETIME,
     @total        DECIMAL(18,2),
     @puntoDeVenta INT,
@@ -2168,7 +2388,7 @@ BEGIN
         RETURN;
     END
 
-    INSERT INTO parques.TicketVenta
+    INSERT INTO ventas.TicketVenta
         (fechaHora, total, puntoDeVenta, nroTicket, formaPago, idParque)
     VALUES
         (@fechaHora, @total, @puntoDeVenta, @nroTicket, LTRIM(RTRIM(@formaPago)), @idParque);
@@ -2177,18 +2397,18 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_TicketVenta_Eliminar
+CREATE OR ALTER PROCEDURE ventas.TicketVenta_Eliminar
     @idTicket INT
 AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.TicketVenta
+    IF NOT EXISTS (SELECT 1 FROM ventas.TicketVenta
                    WHERE idTicket = @idTicket)
         SET @vErrores += '- No existe un ticket con el ID indicado.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.LineaVenta
+    IF EXISTS (SELECT 1 FROM ventas.LineaVenta
                WHERE ticketAsociado = @idTicket)
         SET @vErrores += '- No se puede eliminar: existen lineas de venta asociadas a este ticket.' + CHAR(13);
 
@@ -2198,14 +2418,14 @@ BEGIN
         RETURN;
     END
 
-    DELETE FROM parques.TicketVenta
+    DELETE FROM ventas.TicketVenta
     WHERE idTicket = @idTicket;
 
     PRINT 'Ticket de venta eliminado.';
 END
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_TicketVenta_Actualizar
+CREATE OR ALTER PROCEDURE ventas.TicketVenta_Actualizar
     @idTicket     INT,
     @fechaHora    DATETIME,
     @total        DECIMAL(18,2),
@@ -2218,7 +2438,7 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.TicketVenta
+    IF NOT EXISTS (SELECT 1 FROM ventas.TicketVenta
                    WHERE idTicket = @idTicket)
         SET @vErrores += '- No existe un ticket con el ID indicado.' + CHAR(13);
 
@@ -2248,7 +2468,7 @@ BEGIN
         RETURN;
     END
 
-    UPDATE parques.TicketVenta
+    UPDATE ventas.TicketVenta
     SET fechaHora    = @fechaHora,
         total        = @total,
         puntoDeVenta = @puntoDeVenta,
@@ -2261,9 +2481,11 @@ BEGIN
 END
 GO
 
+-- ============================================================
 -- LINEA VENTA
+-- ============================================================
 
-CREATE OR ALTER PROCEDURE parques.sp_LineaVenta_Insertar
+CREATE OR ALTER PROCEDURE ventas.LineaVenta_Insertar
     @idPrecioEntrada INT = NULL,
     @descripcion     VARCHAR(50),
     @subtotal        DECIMAL(18,2),
@@ -2289,7 +2511,7 @@ BEGIN
     IF @precioUnitario IS NULL OR @precioUnitario < 0
         SET @vErrores += '- El precio unitario debe ser mayor o igual a cero.' + CHAR(13);
 
-    IF NOT EXISTS (SELECT 1 FROM parques.TicketVenta
+    IF NOT EXISTS (SELECT 1 FROM ventas.TicketVenta
                    WHERE idTicket = @ticketAsociado)
         SET @vErrores += '- El ticket asociado no existe.' + CHAR(13);
 
@@ -2301,17 +2523,17 @@ BEGIN
     SET @vErrores += '- La linea de venta debe tener exactamente un item asociado: PrecioEntrada, Tour o Atraccion.' + CHAR(13);
 
     IF @idPrecioEntrada IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM parques.PrecioEntrada
+       AND NOT EXISTS (SELECT 1 FROM ventas.PrecioEntrada
                        WHERE idPrecio = @idPrecioEntrada)
         SET @vErrores += '- El precio de entrada indicado no existe.' + CHAR(13);
 
     IF @idTour IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM parques.Tour
+       AND NOT EXISTS (SELECT 1 FROM actividades.Tour
                        WHERE idTour = @idTour)
         SET @vErrores += '- El tour indicado no existe.' + CHAR(13);
 
     IF @idAtraccion IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM parques.Atraccion
+       AND NOT EXISTS (SELECT 1 FROM actividades.Atraccion
                        WHERE idAtraccion = @idAtraccion)
         SET @vErrores += '- La atraccion indicada no existe.' + CHAR(13);
 
@@ -2321,7 +2543,7 @@ BEGIN
         RETURN;
     END
 
-    INSERT INTO parques.LineaVenta
+    INSERT INTO ventas.LineaVenta
         (idPrecioEntrada, descripcion, subtotal, cantidad, precioUnitario,
          ticketAsociado, idTour, idAtraccion)
     VALUES
@@ -2332,27 +2554,27 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_LineaVenta_Eliminar
+CREATE OR ALTER PROCEDURE ventas.LineaVenta_Eliminar
     @idLineaVenta INT
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    IF NOT EXISTS (SELECT 1 FROM parques.LineaVenta
+    IF NOT EXISTS (SELECT 1 FROM ventas.LineaVenta
                    WHERE idLineaVenta = @idLineaVenta)
     BEGIN
         RAISERROR('- No existe una linea de venta con el ID indicado.', 16, 1);
         RETURN;
     END
 
-    DELETE FROM parques.LineaVenta
+    DELETE FROM ventas.LineaVenta
     WHERE idLineaVenta = @idLineaVenta;
 
     PRINT 'Linea de venta eliminada.';
 END
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_LineaVenta_Actualizar
+CREATE OR ALTER PROCEDURE ventas.LineaVenta_Actualizar
     @idLineaVenta    INT,
     @idPrecioEntrada INT = NULL,
     @descripcion     VARCHAR(50),
@@ -2367,7 +2589,7 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.LineaVenta
+    IF NOT EXISTS (SELECT 1 FROM ventas.LineaVenta
                    WHERE idLineaVenta = @idLineaVenta)
         SET @vErrores += '- No existe una linea de venta con el ID indicado.' + CHAR(13);
 
@@ -2383,7 +2605,7 @@ BEGIN
     IF @precioUnitario IS NULL OR @precioUnitario < 0
         SET @vErrores += '- El precio unitario debe ser mayor o igual a cero.' + CHAR(13);
 
-    IF NOT EXISTS (SELECT 1 FROM parques.TicketVenta
+    IF NOT EXISTS (SELECT 1 FROM ventas.TicketVenta
                    WHERE idTicket = @ticketAsociado)
         SET @vErrores += '- El ticket asociado no existe.' + CHAR(13);
     
@@ -2395,17 +2617,17 @@ BEGIN
     SET @vErrores += '- La linea de venta debe tener exactamente un item asociado: PrecioEntrada, Tour o Atraccion.' + CHAR(13);
 
     IF @idPrecioEntrada IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM parques.PrecioEntrada
+       AND NOT EXISTS (SELECT 1 FROM ventas.PrecioEntrada
                        WHERE idPrecio = @idPrecioEntrada)
         SET @vErrores += '- El precio de entrada indicado no existe.' + CHAR(13);
 
     IF @idTour IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM parques.Tour
+       AND NOT EXISTS (SELECT 1 FROM actividades.Tour
                        WHERE idTour = @idTour)
         SET @vErrores += '- El tour indicado no existe.' + CHAR(13);
 
     IF @idAtraccion IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM parques.Atraccion
+       AND NOT EXISTS (SELECT 1 FROM actividades.Atraccion
                        WHERE idAtraccion = @idAtraccion)
         SET @vErrores += '- La atraccion indicada no existe.' + CHAR(13);
 
@@ -2415,7 +2637,7 @@ BEGIN
         RETURN;
     END
 
-    UPDATE parques.LineaVenta
+    UPDATE ventas.LineaVenta
     SET idPrecioEntrada = @idPrecioEntrada,
         descripcion     = LTRIM(RTRIM(@descripcion)),
         subtotal        = @subtotal,
@@ -2429,27 +2651,34 @@ BEGIN
     PRINT 'Linea de venta actualizada.';
 END
 GO
-
-GO
-
-
 -- ============================================================
--- NEGOCIO - Parques y Guardaparques
+-- 04 - LOGICA DE NEGOCIO
 -- ============================================================
 
+-- =============================================
+-- Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Grupo: 03
+-- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
+-- Fecha: 16/06/2026
+-- Descripcion: Stored Procedures de LOGICA DE NEGOCIO del modulo Parques.
 --              Operaciones que afectan varias tablas, encapsuladas en
 --              transacciones que garantizan la integridad de los datos.
 --              SPs: sp_RegistrarParque             (Ubicacion + Parque)
 --                   sp_RegistrarGuardaparque       (Guardaparque + 1er Asignacion)
 --                   sp_ReasignarGuardaparque       (cierra asignacion + abre nueva)
 --                   sp_RegistrarEgresoGuardaparque (cierra asignacion vigente)
+-- =============================================
 
+USE ParquesNacionales;
 GO
 
+-- ============================================================
 -- REGISTRAR PARQUE
 -- Da de alta la Ubicacion y el Parque en una sola transaccion,
 -- evitando que quede un parque sin ubicacion o una ubicacion huerfana.
-CREATE OR ALTER PROCEDURE parques.sp_RegistrarParque
+-- ============================================================
+CREATE OR ALTER PROCEDURE parques.RegistrarParque
     @nombre       VARCHAR(100),
     @superficie   DECIMAL(18,2),
     @idTipoParque INT,
@@ -2520,11 +2749,13 @@ BEGIN
 END
 GO
 
+-- ============================================================
 -- REGISTRAR GUARDAPARQUE
 -- Alta completa: crea el Guardaparque y su primera asignacion
 -- (parque + fecha de ingreso) en una transaccion, para que no
 -- quede personal sin parque asignado.
-CREATE OR ALTER PROCEDURE parques.sp_RegistrarGuardaparque
+-- ============================================================
+CREATE OR ALTER PROCEDURE personal.RegistrarGuardaparque
     @dni             INT,
     @apyn            VARCHAR(50),
     @idParque        INT,
@@ -2541,7 +2772,7 @@ BEGIN
 
     IF @dni IS NULL OR @dni <= 0
         SET @vErrores += '- El DNI es obligatorio y debe ser mayor a 0.' + CHAR(13);
-    ELSE IF EXISTS (SELECT 1 FROM parques.Guardaparque WHERE dni = @dni)
+    ELSE IF EXISTS (SELECT 1 FROM personal.Guardaparque WHERE dni = @dni)
         SET @vErrores += '- Ya existe un guardaparque registrado con ese DNI.' + CHAR(13);
 
     IF @apyn IS NULL OR LTRIM(RTRIM(@apyn)) = ''
@@ -2568,10 +2799,10 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        INSERT INTO parques.Guardaparque (dni, apyn, email, telefono, localidad, fechaNacimiento)
+        INSERT INTO personal.Guardaparque (dni, apyn, email, telefono, localidad, fechaNacimiento)
         VALUES (@dni, LTRIM(RTRIM(@apyn)), @email, @telefono, @localidad, @fechaNacimiento);
 
-        INSERT INTO parques.AsignacionGuardaparque (fechaInicio, fechaFin, motivoEgreso, idParque, dni)
+        INSERT INTO personal.AsignacionGuardaparque (fechaInicio, fechaFin, motivoEgreso, idParque, dni)
         VALUES (@fechaInicio, NULL, NULL, @idParque, @dni);
 
         COMMIT TRANSACTION;
@@ -2587,11 +2818,13 @@ BEGIN
 END
 GO
 
+-- ============================================================
 -- REASIGNAR GUARDAPARQUE
 -- Cierra la asignacion vigente (le pone fechaFin y motivo) y abre
 -- una nueva en el parque destino, en una sola transaccion. Asi el
 -- guardaparque nunca queda sin asignacion ni con dos vigentes.
-CREATE OR ALTER PROCEDURE parques.sp_ReasignarGuardaparque
+-- ============================================================
+CREATE OR ALTER PROCEDURE personal.ReasignarGuardaparque
     @dni               INT,
     @idParqueDestino   INT,
     @fechaReasignacion DATE,
@@ -2609,10 +2842,10 @@ BEGIN
     SELECT @vIdAsignacionActual = idAsignacion,
            @vIdParqueActual     = idParque,
            @vFechaInicioActual  = fechaInicio
-    FROM parques.AsignacionGuardaparque
+    FROM personal.AsignacionGuardaparque
     WHERE dni = @dni AND fechaFin IS NULL;
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Guardaparque WHERE dni = @dni)
+    IF NOT EXISTS (SELECT 1 FROM personal.Guardaparque WHERE dni = @dni)
         SET @vErrores += '- El guardaparque indicado no existe.' + CHAR(13);
 
     IF NOT EXISTS (SELECT 1 FROM parques.Parque WHERE idParque = @idParqueDestino)
@@ -2643,13 +2876,13 @@ BEGIN
 
         -- 1. Cierra la asignacion vigente (antes de abrir la nueva,
         --    para no violar el indice unico de asignacion activa).
-        UPDATE parques.AsignacionGuardaparque
+        UPDATE personal.AsignacionGuardaparque
         SET fechaFin     = @fechaReasignacion,
             motivoEgreso = @motivoEgreso
         WHERE idAsignacion = @vIdAsignacionActual;
 
         -- 2. Abre la nueva asignacion en el parque destino.
-        INSERT INTO parques.AsignacionGuardaparque (fechaInicio, fechaFin, motivoEgreso, idParque, dni)
+        INSERT INTO personal.AsignacionGuardaparque (fechaInicio, fechaFin, motivoEgreso, idParque, dni)
         VALUES (@fechaReasignacion, NULL, NULL, @idParqueDestino, @dni);
 
         COMMIT TRANSACTION;
@@ -2666,10 +2899,12 @@ BEGIN
 END
 GO
 
+-- ============================================================
 -- REGISTRAR EGRESO DE GUARDAPARQUE
 -- Cierra la asignacion vigente con fecha y motivo de egreso,
 -- sin abrir una nueva (baja definitiva del parque).
-CREATE OR ALTER PROCEDURE parques.sp_RegistrarEgresoGuardaparque
+-- ============================================================
+CREATE OR ALTER PROCEDURE personal.RegistrarEgresoGuardaparque
     @dni          INT,
     @fechaEgreso  DATE,
     @motivoEgreso VARCHAR(255)
@@ -2683,10 +2918,10 @@ BEGIN
 
     SELECT @vIdAsignacionActual = idAsignacion,
            @vFechaInicioActual  = fechaInicio
-    FROM parques.AsignacionGuardaparque
+    FROM personal.AsignacionGuardaparque
     WHERE dni = @dni AND fechaFin IS NULL;
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Guardaparque WHERE dni = @dni)
+    IF NOT EXISTS (SELECT 1 FROM personal.Guardaparque WHERE dni = @dni)
         SET @vErrores += '- El guardaparque indicado no existe.' + CHAR(13);
 
     IF @fechaEgreso IS NULL
@@ -2709,7 +2944,7 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        UPDATE parques.AsignacionGuardaparque
+        UPDATE personal.AsignacionGuardaparque
         SET fechaFin     = @fechaEgreso,
             motivoEgreso = LTRIM(RTRIM(@motivoEgreso))
         WHERE idAsignacion = @vIdAsignacionActual;
@@ -2726,13 +2961,13 @@ BEGIN
 END
 GO
 
-GO
-
-
--- ============================================================
--- NEGOCIO - Concesiones
--- ============================================================
-
+-- =============================================
+-- Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Grupo: 03
+-- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
+-- Fecha: 15/06/2026
+-- Descripcion: Stored Procedures de logica de negocio - modulo Concesiones.
 --   SP 1: sp_AltaConcesionCompleta
 --         Registra una nueva concesion validando integridad entre
 --         empresa, parque, tipo y solapamiento de vigencias.
@@ -2740,9 +2975,12 @@ GO
 --         Registra el pago mensual del canon validando que la
 --         concesion este vigente y que no exista pago duplicado
 --         para el mismo periodo.
+-- =============================================
 
+USE ParquesNacionales;
 GO
 
+-- ============================================================
 -- SP: sp_AltaConcesionCompleta
 -- Logica de negocio: alta de concesion con validaciones cruzadas
 -- Validaciones:
@@ -2754,7 +2992,8 @@ GO
 --   6. canonMensual debe ser mayor a cero
 --   7. No puede existir otra concesion vigente para la misma
 --      combinacion empresa + parque + tipo de actividad
-CREATE OR ALTER PROCEDURE parques.sp_AltaConcesionCompleta
+-- ============================================================
+CREATE OR ALTER PROCEDURE concesiones.AltaConcesionCompleta
     @descripcion     VARCHAR(100),
     @idTipoConcesion INT,
     @idParque        INT,
@@ -2772,7 +3011,7 @@ BEGIN
         SET @vErrores += '- La descripcion de la concesion es obligatoria.' + CHAR(13);
 
     -- Validacion 2: Empresa existe
-    IF NOT EXISTS (SELECT 1 FROM parques.Empresa WHERE idEmpresa = @idEmpresa)
+    IF NOT EXISTS (SELECT 1 FROM concesiones.Empresa WHERE idEmpresa = @idEmpresa)
         SET @vErrores += '- La empresa indicada no existe en el sistema.' + CHAR(13);
 
     -- Validacion 3: Parque existe
@@ -2780,7 +3019,7 @@ BEGIN
         SET @vErrores += '- El parque indicado no existe en el sistema.' + CHAR(13);
 
     -- Validacion 4: Tipo de concesion existe
-    IF NOT EXISTS (SELECT 1 FROM parques.TipoDeConsesion WHERE idTipoConcesion = @idTipoConcesion)
+    IF NOT EXISTS (SELECT 1 FROM concesiones.TipoDeConsesion WHERE idTipoConcesion = @idTipoConcesion)
         SET @vErrores += '- El tipo de concesion indicado no existe.' + CHAR(13);
 
     -- Validacion 5: Rango de fechas valido
@@ -2793,7 +3032,7 @@ BEGIN
 
     -- Validacion 7: Solapamiento de concesion vigente
     IF EXISTS (
-        SELECT 1 FROM parques.Concesion
+        SELECT 1 FROM concesiones.Concesion
         WHERE idEmpresa       = @idEmpresa
           AND idParque        = @idParque
           AND idTipoConcesion = @idTipoConcesion
@@ -2810,7 +3049,7 @@ BEGIN
 
     BEGIN TRANSACTION;
     BEGIN TRY
-        INSERT INTO parques.Concesion
+        INSERT INTO concesiones.Concesion
             (descripcion, idTipoConcesion, idParque, idEmpresa, fechaInicio, fechaFin, canonMensual)
         VALUES
             (LTRIM(RTRIM(@descripcion)), @idTipoConcesion, @idParque, @idEmpresa,
@@ -2828,6 +3067,7 @@ BEGIN
 END
 GO
 
+-- ============================================================
 -- SP: sp_RegistrarPagoCanon
 -- Logica de negocio: pago mensual del canon de una concesion
 -- Validaciones:
@@ -2838,7 +3078,8 @@ GO
 --   5. El monto debe ser mayor a cero
 --   6. El mes del periodo debe estar entre 1 y 12
 --   7. El anio del periodo no puede ser anterior a 2020
-CREATE OR ALTER PROCEDURE parques.sp_RegistrarPagoCanon
+-- ============================================================
+CREATE OR ALTER PROCEDURE concesiones.RegistrarPagoCanon
     @idConcesion INT,
     @monto       DECIMAL(18,2),
     @fechaPago   DATE,
@@ -2854,7 +3095,7 @@ BEGIN
     -- Obtener datos de la concesion
     SELECT @vFechaInicio = fechaInicio,
            @vFechaFin    = fechaFin
-    FROM parques.Concesion
+    FROM concesiones.Concesion
     WHERE idConcesion = @idConcesion;
 
     -- Validacion 1: La concesion existe
@@ -2886,7 +3127,7 @@ BEGIN
 
     -- Validacion 4: Pago duplicado para el mismo periodo
     IF EXISTS (
-        SELECT 1 FROM parques.PagoConcesion
+        SELECT 1 FROM concesiones.PagoConcesion
         WHERE idConcesion = @idConcesion
           AND periodoAnio = @periodoAnio
           AND periodoMes  = @periodoMes
@@ -2914,7 +3155,7 @@ BEGIN
 
     BEGIN TRANSACTION;
     BEGIN TRY
-        INSERT INTO parques.PagoConcesion
+        INSERT INTO concesiones.PagoConcesion
             (idConcesion, monto, fechaPago, periodoAnio, periodoMes)
         VALUES
             (@idConcesion, @monto, @fechaPago, @periodoAnio, @periodoMes);
@@ -2929,127 +3170,13 @@ BEGIN
 END
 GO
 
-GO
-
-
--- ============================================================
--- NEGOCIO - Guías, Tours y Atracciones
--- ============================================================
-
-
-GO
-
--- SP NEGOCIO: Asignar guía a tour
--- Valida: vigencia, superposición de fechas
-CREATE OR ALTER PROCEDURE parques.sp_AsignarGuiaATour
-    @idTour      INT,
-    @dniGuia     INT,
-    @fechaInicio DATE,
-    @fechaFin    DATE
-AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @vErrores VARCHAR(500) = '';
-    DECLARE @vVigencia DATE;
-
-    -- Validar que el tour existe
-    IF NOT EXISTS (SELECT 1 FROM parques.Tour WHERE idTour = @idTour)
-        SET @vErrores = @vErrores + '- El tour especificado no existe.' + CHAR(13);
-
-    -- Validar que el guía existe
-    IF NOT EXISTS (SELECT 1 FROM parques.Guia WHERE dni = @dniGuia)
-        SET @vErrores = @vErrores + '- El guía especificado no existe.' + CHAR(13);
-
-    -- Validar fechas
-    IF @fechaFin < @fechaInicio
-        SET @vErrores = @vErrores + '- La fecha de fin no puede ser anterior a la fecha de inicio.' + CHAR(13);
-
-    -- Validar vigencia de autorización del guía
-    SELECT @vVigencia = vigenciaAutorizacion FROM parques.Guia WHERE dni = @dniGuia;
-    IF @vVigencia < @fechaFin
-        SET @vErrores = @vErrores + '- La autorización del guía vence antes de que finalice la asignación.' + CHAR(13);
-
-    -- Validar superposición de fechas para ese guía
-    IF EXISTS (
-        SELECT 1 FROM parques.AsignacionGuia
-        WHERE dniGuia = @dniGuia
-          AND @fechaInicio <= fechaFin
-          AND @fechaFin >= fechaInicio
-    )
-        SET @vErrores = @vErrores + '- El guía ya tiene una asignación en ese período de fechas.' + CHAR(13);
-
-    IF @vErrores != ''
-    BEGIN
-        RAISERROR(@vErrores, 16, 1);
-        RETURN;
-    END
-
-    BEGIN TRANSACTION;
-    BEGIN TRY
-        INSERT INTO parques.AsignacionGuia (idTour, dniGuia, fechaInicio, fechaFin)
-        VALUES (@idTour, @dniGuia, @fechaInicio, @fechaFin);
-
-        COMMIT TRANSACTION;
-    END TRY
-    BEGIN CATCH
-        ROLLBACK TRANSACTION;
-        THROW;
-    END CATCH
-END
-GO
-
--- SP NEGOCIO: Registrar atracción en un parque
-CREATE OR ALTER PROCEDURE parques.sp_RegistrarAtraccion
-    @nombre         VARCHAR(100),
-    @descripcion    VARCHAR(255) = NULL,
-    @tipo           VARCHAR(50)  = NULL,
-    @precio         DECIMAL(18,2) = 0,
-    @duracion       INT,
-    @cupoMaximo     INT,
-    @idParque       INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @vErrores VARCHAR(500) = '';
-
-    IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
-        SET @vErrores = @vErrores + '- El nombre de la atracción es obligatorio.' + CHAR(13);
-    IF @duracion IS NULL OR @duracion <= 0
-        SET @vErrores = @vErrores + '- La duración debe ser mayor a 0 minutos.' + CHAR(13);
-    IF @cupoMaximo IS NULL OR @cupoMaximo <= 0
-        SET @vErrores = @vErrores + '- El cupo máximo debe ser mayor a 0.' + CHAR(13);
-    IF @precio < 0
-        SET @vErrores = @vErrores + '- El precio no puede ser negativo.' + CHAR(13);
-    IF NOT EXISTS (SELECT 1 FROM parques.Parque WHERE idParque = @idParque)
-        SET @vErrores = @vErrores + '- El parque especificado no existe.' + CHAR(13);
-
-    IF @vErrores != ''
-    BEGIN
-        RAISERROR(@vErrores, 16, 1);
-        RETURN;
-    END
-
-    BEGIN TRANSACTION;
-    BEGIN TRY
-        INSERT INTO parques.Atraccion (nombre, descripcion, tipo, precio, duracion, cupoMaximo, idParque)
-        VALUES (@nombre, @descripcion, @tipo, @precio, @duracion, @cupoMaximo, @idParque);
-
-        COMMIT TRANSACTION;
-    END TRY
-    BEGIN CATCH
-        ROLLBACK TRANSACTION;
-        THROW;
-    END CATCH
-END
-GO
-
-GO
-
-
--- ============================================================
--- NEGOCIO - Ventas
--- ============================================================
-
+-- =============================================
+-- Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Grupo: 03
+-- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
+-- Fecha: 15/06/2026
+-- Descripcion: Stored Procedures de logica de negocio - modulo Ventas y Precios.
 --   SP 1: sp_RegistrarVentaEntrada
 --         Registra una venta de entrada validando parque, tipo de visitante,
 --         precio existente, ticket y linea de venta. Si el ticket no existe,
@@ -3057,9 +3184,12 @@ GO
 --   SP 2: sp_ActualizarPrecioEntrada
 --         Actualiza el precio de entrada para un parque y tipo de visitante,
 --         modificando el valor y la fecha de actualizacion.
+-- =============================================
 
+USE ParquesNacionales;
 GO
 
+-- ============================================================
 -- SP: sp_RegistrarVentaEntrada
 -- Logica de negocio: venta completa de entrada
 -- Validaciones:
@@ -3070,7 +3200,8 @@ GO
 --   5. Punto de venta obligatorio
 --   6. Numero de ticket obligatorio
 --   7. Forma de pago obligatoria
-CREATE OR ALTER PROCEDURE parques.sp_RegistrarVentaEntrada
+-- ============================================================
+CREATE OR ALTER PROCEDURE ventas.RegistrarVentaEntrada
     @idParque        INT,
     @idTipoVisitante INT,
     @cantidad        INT,
@@ -3097,7 +3228,7 @@ BEGIN
         SET @vErrores += '- El parque indicado no existe.' + CHAR(13);
 
     -- Validacion 2: Tipo de visitante existe
-    IF NOT EXISTS (SELECT 1 FROM parques.TipoVisitante WHERE idTipoVisitante = @idTipoVisitante)
+    IF NOT EXISTS (SELECT 1 FROM ventas.TipoVisitante WHERE idTipoVisitante = @idTipoVisitante)
         SET @vErrores += '- El tipo de visitante indicado no existe.' + CHAR(13);
 
     -- Validacion 3: Cantidad valida
@@ -3120,7 +3251,7 @@ BEGIN
     SELECT
         @vIdPrecioEntrada = idPrecio,
         @vPrecioUnitario  = valor
-    FROM parques.PrecioEntrada
+    FROM ventas.PrecioEntrada
     WHERE idParque = @idParque
       AND idTipoVisitante = @idTipoVisitante;
 
@@ -3137,20 +3268,20 @@ BEGIN
     SET @vSubtotal = @cantidad * @vPrecioUnitario;
 
     SELECT @vDescripcion = 'Entrada ' + descripcion
-    FROM parques.TipoVisitante
+    FROM ventas.TipoVisitante
     WHERE idTipoVisitante = @idTipoVisitante;
 
     BEGIN TRANSACTION;
     BEGIN TRY
 
         SELECT @vIdTicket = idTicket
-        FROM parques.TicketVenta
+        FROM ventas.TicketVenta
         WHERE puntoDeVenta = @puntoDeVenta
           AND nroTicket = @nroTicket;
 
         IF @vIdTicket IS NULL
         BEGIN
-            INSERT INTO parques.TicketVenta
+            INSERT INTO ventas.TicketVenta
                 (fechaHora, total, puntoDeVenta, nroTicket, formaPago, idParque)
             VALUES
                 (@fechaHora, 0, @puntoDeVenta, @nroTicket, LTRIM(RTRIM(@formaPago)), @idParque);
@@ -3158,17 +3289,17 @@ BEGIN
             SET @vIdTicket = SCOPE_IDENTITY();
         END
 
-        INSERT INTO parques.LineaVenta
+        INSERT INTO ventas.LineaVenta
             (ticketAsociado, descripcion, subtotal, cantidad, precioUnitario,
              idPrecioEntrada, idTour, idAtraccion)
         VALUES
             (@vIdTicket, @vDescripcion, @vSubtotal, @cantidad, @vPrecioUnitario,
              @vIdPrecioEntrada, NULL, NULL);
 
-        UPDATE parques.TicketVenta
+        UPDATE ventas.TicketVenta
         SET total = (
             SELECT SUM(subtotal)
-            FROM parques.LineaVenta
+            FROM ventas.LineaVenta
             WHERE ticketAsociado = @vIdTicket
         )
         WHERE idTicket = @vIdTicket;
@@ -3184,6 +3315,7 @@ BEGIN
 END
 GO
 
+-- ============================================================
 -- SP: sp_ActualizarPrecioEntrada
 -- Logica de negocio: actualizacion de precio de entrada
 -- Validaciones:
@@ -3192,7 +3324,8 @@ GO
 --   3. Debe existir precio para ese parque y tipo de visitante
 --   4. Nuevo valor debe ser mayor o igual a cero
 --   5. Fecha de actualizacion obligatoria
-CREATE OR ALTER PROCEDURE parques.sp_ActualizarPrecioEntrada
+-- ============================================================
+CREATE OR ALTER PROCEDURE ventas.ActualizarPrecioEntrada
     @idParque           INT,
     @idTipoVisitante    INT,
     @nuevoValor         DECIMAL(18,2),
@@ -3209,7 +3342,7 @@ BEGIN
         SET @vErrores += '- El parque indicado no existe.' + CHAR(13);
 
     -- Validacion 2: Tipo de visitante existe
-    IF NOT EXISTS (SELECT 1 FROM parques.TipoVisitante WHERE idTipoVisitante = @idTipoVisitante)
+    IF NOT EXISTS (SELECT 1 FROM ventas.TipoVisitante WHERE idTipoVisitante = @idTipoVisitante)
         SET @vErrores += '- El tipo de visitante indicado no existe.' + CHAR(13);
 
     -- Validacion 3: Nuevo valor valido
@@ -3222,7 +3355,7 @@ BEGIN
 
     -- Obtener precio existente
     SELECT @vIdPrecio = idPrecio
-    FROM parques.PrecioEntrada
+    FROM ventas.PrecioEntrada
     WHERE idParque = @idParque
       AND idTipoVisitante = @idTipoVisitante;
 
@@ -3239,7 +3372,7 @@ BEGIN
     BEGIN TRANSACTION;
     BEGIN TRY
 
-        UPDATE parques.PrecioEntrada
+        UPDATE ventas.PrecioEntrada
         SET valor = @nuevoValor,
             fechaActualizacion = @fechaActualizacion
         WHERE idPrecio = @vIdPrecio;
@@ -3254,5 +3387,125 @@ BEGIN
     END CATCH;
 END
 GO
+-- =============================================
+-- Universidad: Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Comisión: 01-2900 | Grupo 03
+-- Integrantes: Del Vecchio Fabrizio, Ocampos Horacio,
+--              Ruiz Santillán Facundo, Lago Franco Nehuen
+-- Fecha: 15/06/2026
+-- Descripción: SPs de lógica de negocio - Guías, Tours y Atracciones
+-- =============================================
 
+USE ParquesNacionales;
+GO
+
+-- ==========================================
+-- SP NEGOCIO: Asignar guía a tour
+-- Valida: vigencia, superposición de fechas
+-- ==========================================
+CREATE OR ALTER PROCEDURE personal.AsignarGuiaATour
+    @idTour      INT,
+    @dniGuia     INT,
+    @fechaInicio DATE,
+    @fechaFin    DATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @vErrores VARCHAR(500) = '';
+    DECLARE @vVigencia DATE;
+
+    -- Validar que el tour existe
+    IF NOT EXISTS (SELECT 1 FROM actividades.Tour WHERE idTour = @idTour)
+        SET @vErrores += '- El tour especificado no existe.' + CHAR(13);
+
+    -- Validar que el guía existe
+    IF NOT EXISTS (SELECT 1 FROM personal.Guia WHERE dni = @dniGuia)
+        SET @vErrores += '- El guía especificado no existe.' + CHAR(13);
+
+    -- Validar fechas
+    IF @fechaInicio IS NULL OR @fechaFin IS NULL
+        SET @vErrores += '- Las fechas de inicio y fin son obligatorias.' + CHAR(13);
+    IF @fechaInicio IS NOT NULL AND @fechaFin IS NOT NULL AND @fechaFin < @fechaInicio
+        SET @vErrores += '- La fecha de fin no puede ser anterior a la fecha de inicio.' + CHAR(13);
+
+    -- Validar vigencia de autorización del guía
+    SELECT @vVigencia = vigenciaAutorizacion FROM personal.Guia WHERE dni = @dniGuia;
+    IF @vVigencia IS NOT NULL AND @fechaFin IS NOT NULL AND @vVigencia < @fechaFin
+        SET @vErrores += '- La autorización del guía vence antes de que finalice la asignación.' + CHAR(13);
+
+    -- Validar superposición de fechas para ese guía
+    IF @dniGuia IS NOT NULL AND @fechaInicio IS NOT NULL AND @fechaFin IS NOT NULL AND EXISTS (
+        SELECT 1 FROM personal.AsignacionGuia
+        WHERE dniGuia = @dniGuia
+          AND @fechaInicio <= fechaFin
+          AND @fechaFin >= fechaInicio
+    )
+        SET @vErrores += '- El guía ya tiene una asignación en ese período de fechas.' + CHAR(13);
+
+    IF @vErrores != ''
+    BEGIN
+        RAISERROR(@vErrores, 16, 1);
+        RETURN;
+    END
+
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        INSERT INTO personal.AsignacionGuia (idTour, dniGuia, fechaInicio, fechaFin)
+        VALUES (@idTour, @dniGuia, @fechaInicio, @fechaFin);
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END
+GO
+
+-- ==========================================
+-- SP NEGOCIO: Registrar atracción en un parque
+-- ==========================================
+CREATE OR ALTER PROCEDURE actividades.RegistrarAtraccion
+    @nombre         VARCHAR(100),
+    @descripcion    VARCHAR(255) = NULL,
+    @tipo           VARCHAR(50)  = NULL,
+    @precio         DECIMAL(18,2) = 0,
+    @duracion       INT,
+    @cupoMaximo     INT,
+    @idParque       INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @vErrores VARCHAR(500) = '';
+
+    IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
+        SET @vErrores += '- El nombre de la atracción es obligatorio.' + CHAR(13);
+    IF @duracion IS NULL OR @duracion <= 0
+        SET @vErrores += '- La duración debe ser mayor a 0 minutos.' + CHAR(13);
+    IF @cupoMaximo IS NULL OR @cupoMaximo <= 0
+        SET @vErrores += '- El cupo máximo debe ser mayor a 0.' + CHAR(13);
+    IF @precio IS NULL OR @precio < 0
+        SET @vErrores += '- El precio no puede ser negativo.' + CHAR(13);
+    IF NOT EXISTS (SELECT 1 FROM parques.Parque WHERE idParque = @idParque)
+        SET @vErrores += '- El parque especificado no existe.' + CHAR(13);
+
+    IF @vErrores != ''
+    BEGIN
+        RAISERROR(@vErrores, 16, 1);
+        RETURN;
+    END
+
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        INSERT INTO actividades.Atraccion (nombre, descripcion, tipo, precio, duracion, cupoMaximo, idParque)
+        VALUES (@nombre, @descripcion, @tipo, @precio, @duracion, @cupoMaximo, @idParque);
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END
 GO
