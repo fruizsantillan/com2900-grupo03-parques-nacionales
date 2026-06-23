@@ -21,11 +21,11 @@ DECLARE @idTipo INT, @idParqueA INT, @idParqueB INT;
 
 PRINT '===== SETUP: tipo de parque para las pruebas =====';
 IF NOT EXISTS (SELECT 1 FROM parques.TipoParque WHERE descripcion = 'Reserva Natural')
-    EXEC parques.sp_TipoParque_Insertar @descripcion = 'Reserva Natural';
+    EXEC parques.TipoParque_Insertar @descripcion = 'Reserva Natural';
 SELECT @idTipo = idTipoParque FROM parques.TipoParque WHERE descripcion = 'Reserva Natural';
 
 PRINT '===== TEST 1 (OK): registrar parque (Ubicacion + Parque en una transaccion) =====';
-EXEC parques.sp_RegistrarParque
+EXEC parques.RegistrarParque
      @nombre       = 'Los Alerces',
      @superficie   = 2630.00,
      @idTipoParque = @idTipo,
@@ -43,7 +43,7 @@ WHERE p.idParque = @idParqueA;
 PRINT '===== TEST 2 (ERROR): registrar parque con datos invalidos =====';
 -- Esperado: UN solo mensaje con superficie<=0, tipo inexistente y latitud fuera de rango.
 BEGIN TRY
-    EXEC parques.sp_RegistrarParque
+    EXEC parques.RegistrarParque
          @nombre       = 'Parque Roto',
          @superficie   = 0,
          @idTipoParque = 99999,
@@ -61,19 +61,19 @@ SELECT COUNT(*) AS ubicaciones_huerfanas
 FROM parques.Ubicacion WHERE direccion = 'Direccion X';
 
 PRINT '===== TEST 3 (OK): registrar guardaparque con su asignacion inicial =====';
-EXEC parques.sp_RegistrarGuardaparque
+EXEC personal.RegistrarGuardaparque
      @dni         = 28999888,
      @apyn        = 'Gomez, Ana',
      @idParque    = @idParqueA,
      @fechaInicio = '2025-01-10';
 -- Evidencia: queda una asignacion vigente (fechaFin NULL).
 SELECT idAsignacion, dni, idParque, fechaInicio, fechaFin
-FROM parques.AsignacionGuardaparque WHERE dni = 28999888;
+FROM personal.AsignacionGuardaparque WHERE dni = 28999888;
 
 PRINT '===== TEST 4 (ERROR): registrar guardaparque con dni ya existente =====';
 -- Esperado: '- Ya existe un guardaparque registrado con ese DNI.'
 BEGIN TRY
-    EXEC parques.sp_RegistrarGuardaparque
+    EXEC personal.RegistrarGuardaparque
          @dni         = 28999888,
          @apyn        = 'Otro Nombre',
          @idParque    = @idParqueA,
@@ -85,7 +85,7 @@ BEGIN CATCH
 END CATCH
 
 PRINT '===== SETUP: segundo parque para la reasignacion =====';
-EXEC parques.sp_RegistrarParque
+EXEC parques.RegistrarParque
      @nombre       = 'Lanin',
      @superficie   = 4120.00,
      @idTipoParque = @idTipo,
@@ -96,21 +96,21 @@ EXEC parques.sp_RegistrarParque
 SELECT @idParqueB = idParque FROM parques.Parque WHERE nombre = 'Lanin';
 
 PRINT '===== TEST 5 (OK): reasignar el guardaparque al segundo parque =====';
-EXEC parques.sp_ReasignarGuardaparque
+EXEC personal.ReasignarGuardaparque
      @dni               = 28999888,
      @idParqueDestino   = @idParqueB,
      @fechaReasignacion = '2025-06-01';
 -- Evidencia: 2 filas. La 1ra cerrada (fechaFin=2025-06-01, motivo 'Reasignacion')
 -- y la 2da vigente (fechaFin NULL) en el parque B.
 SELECT idAsignacion, idParque, fechaInicio, fechaFin, motivoEgreso
-FROM parques.AsignacionGuardaparque
+FROM personal.AsignacionGuardaparque
 WHERE dni = 28999888
 ORDER BY fechaInicio;
 
 PRINT '===== TEST 6 (ERROR): reasignar al mismo parque en el que ya esta =====';
 -- Esperado: '- El parque destino es el mismo que el parque actual.'
 BEGIN TRY
-    EXEC parques.sp_ReasignarGuardaparque
+    EXEC personal.ReasignarGuardaparque
          @dni               = 28999888,
          @idParqueDestino   = @idParqueB,
          @fechaReasignacion = '2025-07-01';
@@ -121,19 +121,19 @@ BEGIN CATCH
 END CATCH
 
 PRINT '===== TEST 7 (OK): registrar el egreso del guardaparque =====';
-EXEC parques.sp_RegistrarEgresoGuardaparque
+EXEC personal.RegistrarEgresoGuardaparque
      @dni          = 28999888,
      @fechaEgreso  = '2025-12-31',
      @motivoEgreso = 'Renuncia';
 -- Evidencia: ya no debe quedar ninguna asignacion vigente.
 SELECT COUNT(*) AS asignaciones_vigentes
-FROM parques.AsignacionGuardaparque
+FROM personal.AsignacionGuardaparque
 WHERE dni = 28999888 AND fechaFin IS NULL;
 
 PRINT '===== TEST 8 (ERROR): registrar egreso sin asignacion vigente =====';
 -- Esperado: '- El guardaparque no tiene una asignacion vigente...'
 BEGIN TRY
-    EXEC parques.sp_RegistrarEgresoGuardaparque
+    EXEC personal.RegistrarEgresoGuardaparque
          @dni          = 28999888,
          @fechaEgreso  = '2026-01-15',
          @motivoEgreso = 'Renuncia';

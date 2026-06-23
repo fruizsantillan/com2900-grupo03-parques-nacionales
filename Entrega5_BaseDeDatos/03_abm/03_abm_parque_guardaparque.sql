@@ -18,7 +18,7 @@ GO
 -- ==================
 -- TIPO DE PARQUE - INSERTAR
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_TipoParque_Insertar
+CREATE OR ALTER PROCEDURE parques.TipoParque_Insertar
     @descripcion VARCHAR(100)
 AS
 BEGIN
@@ -48,7 +48,7 @@ GO
 -- ==================
 -- TIPO DE PARQUE - ACTUALIZAR
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_TipoParque_Actualizar
+CREATE OR ALTER PROCEDURE parques.TipoParque_Actualizar
     @idTipoParque INT,
     @descripcion  VARCHAR(100)
 AS
@@ -85,7 +85,7 @@ GO
 -- ==================
 -- TIPO DE PARQUE - ELIMINAR
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_TipoParque_Eliminar
+CREATE OR ALTER PROCEDURE parques.TipoParque_Eliminar
     @idTipoParque INT
 AS
 BEGIN
@@ -114,7 +114,7 @@ GO
 -- ==================
 -- TIPO DE PARQUE - OBTENER POR ID
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_TipoParque_ObtenerPorId
+CREATE OR ALTER PROCEDURE parques.TipoParque_ObtenerPorId
     @idTipoParque INT
 AS
 BEGIN
@@ -129,7 +129,7 @@ GO
 -- ==================
 -- UBICACION - INSERTAR
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_Ubicacion_Insertar
+CREATE OR ALTER PROCEDURE parques.Ubicacion_Insertar
     @direccion VARCHAR(100),
     @provincia VARCHAR(50),
     @latitud   DECIMAL(9,6),
@@ -167,7 +167,7 @@ GO
 -- ==================
 -- UBICACION - ACTUALIZAR
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_Ubicacion_Actualizar
+CREATE OR ALTER PROCEDURE parques.Ubicacion_Actualizar
     @idUbicacion INT,
     @direccion   VARCHAR(100),
     @provincia   VARCHAR(50),
@@ -214,7 +214,7 @@ GO
 -- ==================
 -- UBICACION - ELIMINAR
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_Ubicacion_Eliminar
+CREATE OR ALTER PROCEDURE parques.Ubicacion_Eliminar
     @idUbicacion INT
 AS
 BEGIN
@@ -243,7 +243,7 @@ GO
 -- ==================
 -- UBICACION - OBTENER POR ID
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_Ubicacion_ObtenerPorId
+CREATE OR ALTER PROCEDURE parques.Ubicacion_ObtenerPorId
     @idUbicacion INT
 AS
 BEGIN
@@ -258,7 +258,7 @@ GO
 -- ==================
 -- PARQUE - INSERTAR
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_Parque_Insertar
+CREATE OR ALTER PROCEDURE parques.Parque_Insertar
     @nombre       VARCHAR(100),
     @superficie   DECIMAL(18,2),
     @idTipoParque INT,
@@ -302,7 +302,7 @@ GO
 -- ==================
 -- PARQUE - ACTUALIZAR
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_Parque_Actualizar
+CREATE OR ALTER PROCEDURE parques.Parque_Actualizar
     @idParque     INT,
     @nombre       VARCHAR(100),
     @superficie   DECIMAL(18,2),
@@ -357,11 +357,11 @@ GO
 -- PARQUE - ELIMINAR
 -- ==================
 -- Un parque es referenciado desde varios modulos. NO puede eliminarse si tiene:
---   parques.Tour, parques.Atraccion, parques.AsignacionGuardaparque
+--   actividades.Tour, actividades.Atraccion, personal.AsignacionGuardaparque
 --   ventas.PrecioEntrada, ventas.TicketVenta  (esquema ventas, modulo en construccion)
 --   concesiones.Concesion
     
-CREATE OR ALTER PROCEDURE parques.sp_Parque_Eliminar
+CREATE OR ALTER PROCEDURE parques.Parque_Eliminar
     @idParque INT
 AS
 BEGIN
@@ -372,15 +372,15 @@ BEGIN
                    WHERE idParque = @idParque)
         SET @vErrores += '- No existe un parque con el ID indicado.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.Tour
+    IF EXISTS (SELECT 1 FROM actividades.Tour
                WHERE idParque = @idParque)
         SET @vErrores += '- No se puede eliminar: el parque tiene tours registrados.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.Atraccion
+    IF EXISTS (SELECT 1 FROM actividades.Atraccion
                WHERE idParque = @idParque)
         SET @vErrores += '- No se puede eliminar: el parque tiene atracciones registradas.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.AsignacionGuardaparque
+    IF EXISTS (SELECT 1 FROM personal.AsignacionGuardaparque
                WHERE idParque = @idParque)
         SET @vErrores += '- No se puede eliminar: el parque tiene asignaciones de guardaparques.' + CHAR(13);
 
@@ -410,7 +410,7 @@ GO
 -- ==================
 -- PARQUE - OBTENER POR ID
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_Parque_ObtenerPorId
+CREATE OR ALTER PROCEDURE parques.Parque_ObtenerPorId
     @idParque INT
 AS
 BEGIN
@@ -425,7 +425,7 @@ GO
 -- ==================
 -- GUARDAPARQUE - INSERTAR
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_Guardaparque_Insertar
+CREATE OR ALTER PROCEDURE personal.Guardaparque_Insertar
     @dni             INT,
     @apyn            VARCHAR(50),
     @email           VARCHAR(100) = NULL,
@@ -439,7 +439,7 @@ BEGIN
 
     IF @dni IS NULL OR @dni <= 0
         SET @vErrores += '- El DNI es obligatorio y debe ser mayor a 0.' + CHAR(13);
-    ELSE IF EXISTS (SELECT 1 FROM parques.Guardaparque
+    ELSE IF EXISTS (SELECT 1 FROM personal.Guardaparque
                     WHERE dni = @dni)
         SET @vErrores += '- Ya existe un guardaparque registrado con ese DNI.' + CHAR(13);
 
@@ -458,7 +458,7 @@ BEGIN
         RETURN;
     END
 
-    INSERT INTO parques.Guardaparque (dni, apyn, email, telefono, localidad, fechaNacimiento)
+    INSERT INTO personal.Guardaparque (dni, apyn, email, telefono, localidad, fechaNacimiento)
     VALUES (@dni, LTRIM(RTRIM(@apyn)), @email, @telefono, @localidad, @fechaNacimiento);
 
     PRINT 'Guardaparque registrado con DNI: ' + CAST(@dni AS VARCHAR);
@@ -468,7 +468,7 @@ GO
 -- ==================
 -- GUARDAPARQUE - ACTUALIZAR
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_Guardaparque_Actualizar
+CREATE OR ALTER PROCEDURE personal.Guardaparque_Actualizar
     @dni             INT,
     @apyn            VARCHAR(50),
     @email           VARCHAR(100) = NULL,
@@ -480,7 +480,7 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Guardaparque
+    IF NOT EXISTS (SELECT 1 FROM personal.Guardaparque
                    WHERE dni = @dni)
         SET @vErrores += '- No existe un guardaparque con el DNI indicado.' + CHAR(13);
 
@@ -499,7 +499,7 @@ BEGIN
         RETURN;
     END
 
-    UPDATE parques.Guardaparque
+    UPDATE personal.Guardaparque
     SET apyn            = LTRIM(RTRIM(@apyn)),
         email           = @email,
         telefono        = @telefono,
@@ -514,18 +514,18 @@ GO
 -- ==================
 -- GUARDAPARQUE - ELIMINAR
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_Guardaparque_Eliminar
+CREATE OR ALTER PROCEDURE personal.Guardaparque_Eliminar
     @dni INT
 AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Guardaparque
+    IF NOT EXISTS (SELECT 1 FROM personal.Guardaparque
                    WHERE dni = @dni)
         SET @vErrores += '- No existe un guardaparque con el DNI indicado.' + CHAR(13);
 
-    IF EXISTS (SELECT 1 FROM parques.AsignacionGuardaparque
+    IF EXISTS (SELECT 1 FROM personal.AsignacionGuardaparque
                WHERE dni = @dni)
         SET @vErrores += '- No se puede eliminar: el guardaparque tiene asignaciones registradas.' + CHAR(13);
 
@@ -535,7 +535,7 @@ BEGIN
         RETURN;
     END
 
-    DELETE FROM parques.Guardaparque WHERE dni = @dni;
+    DELETE FROM personal.Guardaparque WHERE dni = @dni;
     PRINT 'Guardaparque eliminado.';
 END
 GO
@@ -543,14 +543,14 @@ GO
 -- ==================
 -- GUARDAPARQUE - OBTENER POR ID
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_Guardaparque_ObtenerPorId
+CREATE OR ALTER PROCEDURE personal.Guardaparque_ObtenerPorId
     @dni INT
 AS
 BEGIN
     SET NOCOUNT ON;
 
     SELECT dni, apyn, email, telefono, localidad, fechaNacimiento
-    FROM parques.Guardaparque
+    FROM personal.Guardaparque
     WHERE dni = @dni;
 END
 GO
@@ -558,7 +558,7 @@ GO
 -- ==================
 -- ASIGNACION GUARDAPARQUE - INSERTAR
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_AsignacionGuardaparque_Insertar
+CREATE OR ALTER PROCEDURE personal.AsignacionGuardaparque_Insertar
     @fechaInicio  DATE,
     @idParque     INT,
     @dni          INT,
@@ -576,7 +576,7 @@ BEGIN
                    WHERE idParque = @idParque)
         SET @vErrores += '- El parque indicado no existe.' + CHAR(13);
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Guardaparque
+    IF NOT EXISTS (SELECT 1 FROM personal.Guardaparque
                    WHERE dni = @dni)
         SET @vErrores += '- El guardaparque indicado no existe.' + CHAR(13);
 
@@ -586,7 +586,7 @@ BEGIN
     IF @fechaFin IS NOT NULL AND (@motivoEgreso IS NULL OR LTRIM(RTRIM(@motivoEgreso)) = '')
         SET @vErrores += '- Si se indica fecha de fin, el motivo de egreso es obligatorio.' + CHAR(13);
 
-    IF @fechaFin IS NULL AND EXISTS (SELECT 1 FROM parques.AsignacionGuardaparque
+    IF @fechaFin IS NULL AND EXISTS (SELECT 1 FROM personal.AsignacionGuardaparque
                                      WHERE dni = @dni AND fechaFin IS NULL)
         SET @vErrores += '- El guardaparque ya tiene una asignacion activa (sin fecha de fin).' + CHAR(13);
 
@@ -596,7 +596,7 @@ BEGIN
         RETURN;
     END
 
-    INSERT INTO parques.AsignacionGuardaparque
+    INSERT INTO personal.AsignacionGuardaparque
         (fechaInicio, fechaFin, motivoEgreso, idParque, dni)
     VALUES
         (@fechaInicio, @fechaFin, @motivoEgreso, @idParque, @dni);
@@ -608,7 +608,7 @@ GO
 -- ==================
 -- ASIGNACION GUARDAPARQUE - ACTUALIZAR
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_AsignacionGuardaparque_Actualizar
+CREATE OR ALTER PROCEDURE personal.AsignacionGuardaparque_Actualizar
     @idAsignacion INT,
     @fechaInicio  DATE,
     @idParque     INT,
@@ -620,7 +620,7 @@ BEGIN
     SET NOCOUNT ON;
     DECLARE @vErrores NVARCHAR(MAX) = '';
 
-    IF NOT EXISTS (SELECT 1 FROM parques.AsignacionGuardaparque
+    IF NOT EXISTS (SELECT 1 FROM personal.AsignacionGuardaparque
                    WHERE idAsignacion = @idAsignacion)
         SET @vErrores += '- No existe una asignacion con el ID indicado.' + CHAR(13);
 
@@ -631,7 +631,7 @@ BEGIN
                    WHERE idParque = @idParque)
         SET @vErrores += '- El parque indicado no existe.' + CHAR(13);
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Guardaparque
+    IF NOT EXISTS (SELECT 1 FROM personal.Guardaparque
                    WHERE dni = @dni)
         SET @vErrores += '- El guardaparque indicado no existe.' + CHAR(13);
 
@@ -641,7 +641,7 @@ BEGIN
     IF @fechaFin IS NOT NULL AND (@motivoEgreso IS NULL OR LTRIM(RTRIM(@motivoEgreso)) = '')
         SET @vErrores += '- Si se indica fecha de fin, el motivo de egreso es obligatorio.' + CHAR(13);
 
-    IF @fechaFin IS NULL AND EXISTS (SELECT 1 FROM parques.AsignacionGuardaparque
+    IF @fechaFin IS NULL AND EXISTS (SELECT 1 FROM personal.AsignacionGuardaparque
                                      WHERE dni = @dni
                                        AND fechaFin IS NULL
                                        AND idAsignacion != @idAsignacion)
@@ -653,7 +653,7 @@ BEGIN
         RETURN;
     END
 
-    UPDATE parques.AsignacionGuardaparque
+    UPDATE personal.AsignacionGuardaparque
     SET fechaInicio  = @fechaInicio,
         fechaFin     = @fechaFin,
         motivoEgreso = @motivoEgreso,
@@ -668,20 +668,20 @@ GO
 -- ==================
 -- ASIGNACION GUARDAPARQUE - ELIMINAR
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_AsignacionGuardaparque_Eliminar
+CREATE OR ALTER PROCEDURE personal.AsignacionGuardaparque_Eliminar
     @idAsignacion INT
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    IF NOT EXISTS (SELECT 1 FROM parques.AsignacionGuardaparque
+    IF NOT EXISTS (SELECT 1 FROM personal.AsignacionGuardaparque
                    WHERE idAsignacion = @idAsignacion)
     BEGIN
         RAISERROR('- No existe una asignacion con el ID indicado.', 16, 1);
         RETURN;
     END
 
-    DELETE FROM parques.AsignacionGuardaparque WHERE idAsignacion = @idAsignacion;
+    DELETE FROM personal.AsignacionGuardaparque WHERE idAsignacion = @idAsignacion;
     PRINT 'Asignacion eliminada.';
 END
 GO
@@ -689,14 +689,14 @@ GO
 -- ==================
 -- ASIGNACION GUARDAPARQUE - OBTENER POR ID
 -- ==================
-CREATE OR ALTER PROCEDURE parques.sp_AsignacionGuardaparque_ObtenerPorId
+CREATE OR ALTER PROCEDURE personal.AsignacionGuardaparque_ObtenerPorId
     @idAsignacion INT
 AS
 BEGIN
     SET NOCOUNT ON;
 
     SELECT idAsignacion, fechaInicio, fechaFin, motivoEgreso, idParque, dni
-    FROM parques.AsignacionGuardaparque
+    FROM personal.AsignacionGuardaparque
     WHERE idAsignacion = @idAsignacion;
 END
 GO

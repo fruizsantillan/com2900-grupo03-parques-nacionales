@@ -18,7 +18,7 @@ GO
 -- TIPO VISITANTE
 -- ============================================================
 
-CREATE OR ALTER PROCEDURE ventas.sp_TipoVisitante_Insertar
+CREATE OR ALTER PROCEDURE ventas.TipoVisitante_Insertar
     @descripcion VARCHAR(100)
 AS
 BEGIN
@@ -45,7 +45,7 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE ventas.sp_TipoVisitante_Eliminar
+CREATE OR ALTER PROCEDURE ventas.TipoVisitante_Eliminar
     @idTipoVisitante INT
 AS
 BEGIN
@@ -73,7 +73,7 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE ventas.sp_TipoVisitante_Actualizar
+CREATE OR ALTER PROCEDURE ventas.TipoVisitante_Actualizar
     @idTipoVisitante INT,
     @descripcion     VARCHAR(100)
 AS
@@ -111,7 +111,7 @@ GO
 -- PRECIO ENTRADA
 -- ============================================================
 
-CREATE OR ALTER PROCEDURE ventas.sp_PrecioEntrada_Insertar
+CREATE OR ALTER PROCEDURE ventas.PrecioEntrada_Insertar
     @fechaActualizacion DATE,
     @valor              DECIMAL(18,2),
     @idParque           INT,
@@ -163,7 +163,7 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE ventas.sp_PrecioEntrada_Eliminar
+CREATE OR ALTER PROCEDURE ventas.PrecioEntrada_Eliminar
     @idPrecio INT
 AS
 BEGIN
@@ -191,7 +191,7 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE ventas.sp_PrecioEntrada_Actualizar
+CREATE OR ALTER PROCEDURE ventas.PrecioEntrada_Actualizar
     @idPrecio           INT,
     @fechaActualizacion DATE,
     @valor              DECIMAL(18,2),
@@ -246,7 +246,7 @@ GO
 -- TICKET VENTA
 -- ============================================================
 
-CREATE OR ALTER PROCEDURE ventas.sp_TicketVenta_Insertar
+CREATE OR ALTER PROCEDURE ventas.TicketVenta_Insertar
     @fechaHora    DATETIME,
     @total        DECIMAL(18,2),
     @puntoDeVenta INT,
@@ -293,7 +293,7 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE ventas.sp_TicketVenta_Eliminar
+CREATE OR ALTER PROCEDURE ventas.TicketVenta_Eliminar
     @idTicket INT
 AS
 BEGIN
@@ -321,7 +321,7 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE ventas.sp_TicketVenta_Actualizar
+CREATE OR ALTER PROCEDURE ventas.TicketVenta_Actualizar
     @idTicket     INT,
     @fechaHora    DATETIME,
     @total        DECIMAL(18,2),
@@ -381,7 +381,7 @@ GO
 -- LINEA VENTA
 -- ============================================================
 
-CREATE OR ALTER PROCEDURE ventas.sp_LineaVenta_Insertar
+CREATE OR ALTER PROCEDURE ventas.LineaVenta_Insertar
     @idPrecioEntrada INT = NULL,
     @descripcion     VARCHAR(50),
     @subtotal        DECIMAL(18,2),
@@ -424,12 +424,12 @@ BEGIN
         SET @vErrores += '- El precio de entrada indicado no existe.' + CHAR(13);
 
     IF @idTour IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM parques.Tour
+       AND NOT EXISTS (SELECT 1 FROM actividades.Tour
                        WHERE idTour = @idTour)
         SET @vErrores += '- El tour indicado no existe.' + CHAR(13);
 
     IF @idAtraccion IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM parques.Atraccion
+       AND NOT EXISTS (SELECT 1 FROM actividades.Atraccion
                        WHERE idAtraccion = @idAtraccion)
         SET @vErrores += '- La atraccion indicada no existe.' + CHAR(13);
 
@@ -450,7 +450,7 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE ventas.sp_LineaVenta_Eliminar
+CREATE OR ALTER PROCEDURE ventas.LineaVenta_Eliminar
     @idLineaVenta INT
 AS
 BEGIN
@@ -470,7 +470,7 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE ventas.sp_LineaVenta_Actualizar
+CREATE OR ALTER PROCEDURE ventas.LineaVenta_Actualizar
     @idLineaVenta    INT,
     @idPrecioEntrada INT = NULL,
     @descripcion     VARCHAR(50),
@@ -518,12 +518,12 @@ BEGIN
         SET @vErrores += '- El precio de entrada indicado no existe.' + CHAR(13);
 
     IF @idTour IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM parques.Tour
+       AND NOT EXISTS (SELECT 1 FROM actividades.Tour
                        WHERE idTour = @idTour)
         SET @vErrores += '- El tour indicado no existe.' + CHAR(13);
 
     IF @idAtraccion IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM parques.Atraccion
+       AND NOT EXISTS (SELECT 1 FROM actividades.Atraccion
                        WHERE idAtraccion = @idAtraccion)
         SET @vErrores += '- La atraccion indicada no existe.' + CHAR(13);
 

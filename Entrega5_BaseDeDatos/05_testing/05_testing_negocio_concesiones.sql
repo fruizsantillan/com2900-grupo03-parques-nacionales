@@ -19,15 +19,15 @@ GO
 -- (Si ya existen de los tests ABM, comentar este bloque)
 -- ============================================================
 
-EXEC concesiones.sp_TipoConsesion_Insertar @descripcion = 'Gastronomia';
-EXEC concesiones.sp_TipoConsesion_Insertar @descripcion = 'Turismo aventura';
+EXEC concesiones.TipoConsesion_Insertar @descripcion = 'Gastronomia';
+EXEC concesiones.TipoConsesion_Insertar @descripcion = 'Turismo aventura';
 
-EXEC concesiones.sp_Empresa_Insertar
+EXEC concesiones.Empresa_Insertar
     @razonSocial = 'La Cabana del Bosque S.R.L.',
     @cuit        = '30712345678',
     @email       = 'contacto@cabanabosque.com';
 
-EXEC concesiones.sp_Empresa_Insertar
+EXEC concesiones.Empresa_Insertar
     @razonSocial = 'Aventura Patagonica S.A.',
     @cuit        = '30798765432',
     @email       = 'info@aventurapatag.com';
@@ -36,11 +36,8 @@ EXEC concesiones.sp_Empresa_Insertar
 -- TESTING: sp_AltaConcesionCompleta
 -- ============================================================
 
-PRINT '=== TEST: sp_AltaConcesionCompleta ===';
-
--- [EXITOSO] Alta de concesion valida
-PRINT '-- Caso exitoso: concesion nueva sin solapamiento';
-EXEC concesiones.sp_AltaConcesionCompleta
+PRINT '===== TEST 1 (OK): alta de concesion valida sin solapamiento =====';
+EXEC concesiones.AltaConcesionCompleta
     @descripcion     = 'Restaurante principal - Parque Nahuel Huapi',
     @idTipoConcesion = 1,
     @idParque        = 1,
@@ -48,7 +45,6 @@ EXEC concesiones.sp_AltaConcesionCompleta
     @fechaInicio     = '2025-01-01',
     @fechaFin        = '2026-12-31',
     @canonMensual    = 150000.00;
-
 -- Evidencia
 SELECT
     c.idConcesion,
@@ -62,10 +58,9 @@ FROM concesiones.Concesion c
 JOIN concesiones.TipoDeConsesion t ON t.idTipoConcesion = c.idTipoConcesion
 JOIN concesiones.Empresa e         ON e.idEmpresa       = c.idEmpresa;
 
--- [FALLIDO] Empresa inexistente
-PRINT '-- Fallo: empresa no existe';
+PRINT '===== TEST 2 (ERROR): empresa inexistente =====';
 BEGIN TRY
-    EXEC concesiones.sp_AltaConcesionCompleta
+    EXEC concesiones.AltaConcesionCompleta
         @descripcion     = 'Concesion empresa fantasma',
         @idTipoConcesion = 1,
         @idParque        = 1,
@@ -73,15 +68,15 @@ BEGIN TRY
         @fechaInicio     = '2025-01-01',
         @fechaFin        = '2026-12-31',
         @canonMensual    = 50000.00;
+    PRINT 'FALLO LA PRUEBA: se esperaba error de empresa inexistente.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [FALLIDO] Parque inexistente
-PRINT '-- Fallo: parque no existe';
+PRINT '===== TEST 3 (ERROR): parque inexistente =====';
 BEGIN TRY
-    EXEC concesiones.sp_AltaConcesionCompleta
+    EXEC concesiones.AltaConcesionCompleta
         @descripcion     = 'Concesion parque fantasma',
         @idTipoConcesion = 1,
         @idParque        = 999,
@@ -89,15 +84,15 @@ BEGIN TRY
         @fechaInicio     = '2025-01-01',
         @fechaFin        = '2026-12-31',
         @canonMensual    = 50000.00;
+    PRINT 'FALLO LA PRUEBA: se esperaba error de parque inexistente.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [FALLIDO] Solapamiento de concesion vigente (misma empresa + parque + tipo)
-PRINT '-- Fallo: ya existe concesion vigente para empresa/parque/tipo';
+PRINT '===== TEST 4 (ERROR): solapamiento con concesion vigente misma empresa/parque/tipo =====';
 BEGIN TRY
-    EXEC concesiones.sp_AltaConcesionCompleta
+    EXEC concesiones.AltaConcesionCompleta
         @descripcion     = 'Segunda concesion gastronomica misma empresa',
         @idTipoConcesion = 1,
         @idParque        = 1,
@@ -105,15 +100,15 @@ BEGIN TRY
         @fechaInicio     = '2026-01-01',
         @fechaFin        = '2027-12-31',
         @canonMensual    = 160000.00;
+    PRINT 'FALLO LA PRUEBA: se esperaba bloqueo por solapamiento de concesion vigente.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [FALLIDO] Multiples errores simultaneos
-PRINT '-- Fallo: multiples errores simultaneos';
+PRINT '===== TEST 5 (ERROR): multiples errores simultaneos =====';
 BEGIN TRY
-    EXEC concesiones.sp_AltaConcesionCompleta
+    EXEC concesiones.AltaConcesionCompleta
         @descripcion     = '',
         @idTipoConcesion = 999,
         @idParque        = 999,
@@ -121,14 +116,14 @@ BEGIN TRY
         @fechaInicio     = '2026-01-01',
         @fechaFin        = '2025-01-01',
         @canonMensual    = 0;
+    PRINT 'FALLO LA PRUEBA: se esperaban errores combinados de descripcion, IDs y fechas.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [EXITOSO] Segunda concesion valida (diferente tipo)
-PRINT '-- Caso exitoso: misma empresa, mismo parque, diferente tipo';
-EXEC concesiones.sp_AltaConcesionCompleta
+PRINT '===== TEST 6 (OK): misma empresa, mismo parque, diferente tipo =====';
+EXEC concesiones.AltaConcesionCompleta
     @descripcion     = 'Excursiones de trekking - Parque Nahuel Huapi',
     @idTipoConcesion = 2,
     @idParque        = 1,
@@ -136,33 +131,27 @@ EXEC concesiones.sp_AltaConcesionCompleta
     @fechaInicio     = '2025-06-01',
     @fechaFin        = '2027-05-31',
     @canonMensual    = 95000.00;
-
 SELECT * FROM concesiones.Concesion;
 
 -- ============================================================
 -- TESTING: sp_RegistrarPagoCanon
 -- ============================================================
 
-PRINT '=== TEST: sp_RegistrarPagoCanon ===';
-
--- [EXITOSO] Pago del canon del mes 1/2025
-PRINT '-- Caso exitoso: primer pago';
-EXEC concesiones.sp_RegistrarPagoCanon
+PRINT '===== TEST 7 (OK): primer pago de canon =====';
+EXEC concesiones.RegistrarPagoCanon
     @idConcesion = 1,
     @monto       = 150000.00,
     @fechaPago   = '2025-02-05',
     @periodoAnio = 2025,
     @periodoMes  = 1;
 
--- [EXITOSO] Pago del mes 2/2025
-PRINT '-- Caso exitoso: segundo pago';
-EXEC concesiones.sp_RegistrarPagoCanon
+PRINT '===== TEST 8 (OK): segundo pago de canon =====';
+EXEC concesiones.RegistrarPagoCanon
     @idConcesion = 1,
     @monto       = 150000.00,
     @fechaPago   = '2025-03-03',
     @periodoAnio = 2025,
     @periodoMes  = 2;
-
 -- Evidencia
 SELECT
     p.idPagoConcesion,
@@ -175,92 +164,92 @@ FROM concesiones.PagoConcesion p
 JOIN concesiones.Concesion c ON c.idConcesion = p.idConcesion
 ORDER BY p.periodoAnio, p.periodoMes;
 
--- [FALLIDO] Periodo duplicado
-PRINT '-- Fallo: pago duplicado para el mismo periodo';
+PRINT '===== TEST 9 (ERROR): pago duplicado para el mismo periodo =====';
 BEGIN TRY
-    EXEC concesiones.sp_RegistrarPagoCanon
+    EXEC concesiones.RegistrarPagoCanon
         @idConcesion = 1,
         @monto       = 150000.00,
         @fechaPago   = '2025-02-10',
         @periodoAnio = 2025,
         @periodoMes  = 1;
+    PRINT 'FALLO LA PRUEBA: se esperaba error de periodo duplicado.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [FALLIDO] Concesion inexistente
-PRINT '-- Fallo: concesion no existe';
+PRINT '===== TEST 10 (ERROR): concesion inexistente =====';
 BEGIN TRY
-    EXEC concesiones.sp_RegistrarPagoCanon
+    EXEC concesiones.RegistrarPagoCanon
         @idConcesion = 999,
         @monto       = 50000.00,
         @fechaPago   = '2025-02-05',
         @periodoAnio = 2025,
         @periodoMes  = 1;
+    PRINT 'FALLO LA PRUEBA: se esperaba error de concesion inexistente.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [FALLIDO] Periodo anterior al inicio de la concesion
-PRINT '-- Fallo: periodo anterior al inicio de la concesion';
+PRINT '===== TEST 11 (ERROR): periodo anterior al inicio de la concesion =====';
 BEGIN TRY
-    EXEC concesiones.sp_RegistrarPagoCanon
+    EXEC concesiones.RegistrarPagoCanon
         @idConcesion = 1,
         @monto       = 150000.00,
         @fechaPago   = '2024-12-05',
         @periodoAnio = 2024,
         @periodoMes  = 12;
+    PRINT 'FALLO LA PRUEBA: se esperaba error de periodo fuera del rango de la concesion.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [FALLIDO] Periodo posterior al vencimiento de la concesion
-PRINT '-- Fallo: periodo posterior al vencimiento';
+PRINT '===== TEST 12 (ERROR): periodo posterior al vencimiento de la concesion =====';
 BEGIN TRY
-    EXEC concesiones.sp_RegistrarPagoCanon
+    EXEC concesiones.RegistrarPagoCanon
         @idConcesion = 1,
         @monto       = 150000.00,
         @fechaPago   = '2027-01-05',
         @periodoAnio = 2027,
         @periodoMes  = 1;
+    PRINT 'FALLO LA PRUEBA: se esperaba error de periodo posterior al vencimiento.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [FALLIDO] Mes invalido
-PRINT '-- Fallo: mes invalido (0)';
+PRINT '===== TEST 13 (ERROR): mes invalido (0) =====';
 BEGIN TRY
-    EXEC concesiones.sp_RegistrarPagoCanon
+    EXEC concesiones.RegistrarPagoCanon
         @idConcesion = 1,
         @monto       = 150000.00,
         @fechaPago   = '2025-01-05',
         @periodoAnio = 2025,
         @periodoMes  = 0;
+    PRINT 'FALLO LA PRUEBA: se esperaba error de mes fuera de rango.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [FALLIDO] Monto negativo y mes invalido (multiples errores)
-PRINT '-- Fallo: multiples errores simultaneos';
+PRINT '===== TEST 14 (ERROR): monto negativo y mes invalido (multiples errores) =====';
 BEGIN TRY
-    EXEC concesiones.sp_RegistrarPagoCanon
+    EXEC concesiones.RegistrarPagoCanon
         @idConcesion = 1,
         @monto       = -1000.00,
         @fechaPago   = '2025-01-05',
         @periodoAnio = 2019,
         @periodoMes  = 13;
+    PRINT 'FALLO LA PRUEBA: se esperaban errores combinados de monto, anio y mes.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
 -- Evidencia final: todos los pagos registrados
-PRINT '-- Estado final de pagos:';
+PRINT '===== Estado final de pagos =====';
 SELECT
     p.idPagoConcesion,
     c.descripcion AS concesion,
@@ -273,7 +262,7 @@ JOIN concesiones.Concesion c ON c.idConcesion = p.idConcesion
 ORDER BY p.periodoAnio, p.periodoMes;
 
 -- Reporte: concesiones con pagos atrasados (mes anterior sin pago)
-PRINT '-- Reporte: concesiones con pagos atrasados (mes anterior sin pago)';
+PRINT '===== Reporte: concesiones con pagos atrasados =====';
 SELECT
     c.idConcesion,
     c.descripcion,

@@ -21,7 +21,7 @@ GO
 -- Da de alta la Ubicacion y el Parque en una sola transaccion,
 -- evitando que quede un parque sin ubicacion o una ubicacion huerfana.
 -- ============================================================
-CREATE OR ALTER PROCEDURE parques.sp_RegistrarParque
+CREATE OR ALTER PROCEDURE parques.RegistrarParque
     @nombre       VARCHAR(100),
     @superficie   DECIMAL(18,2),
     @idTipoParque INT,
@@ -98,7 +98,7 @@ GO
 -- (parque + fecha de ingreso) en una transaccion, para que no
 -- quede personal sin parque asignado.
 -- ============================================================
-CREATE OR ALTER PROCEDURE parques.sp_RegistrarGuardaparque
+CREATE OR ALTER PROCEDURE personal.RegistrarGuardaparque
     @dni             INT,
     @apyn            VARCHAR(50),
     @idParque        INT,
@@ -115,7 +115,7 @@ BEGIN
 
     IF @dni IS NULL OR @dni <= 0
         SET @vErrores += '- El DNI es obligatorio y debe ser mayor a 0.' + CHAR(13);
-    ELSE IF EXISTS (SELECT 1 FROM parques.Guardaparque WHERE dni = @dni)
+    ELSE IF EXISTS (SELECT 1 FROM personal.Guardaparque WHERE dni = @dni)
         SET @vErrores += '- Ya existe un guardaparque registrado con ese DNI.' + CHAR(13);
 
     IF @apyn IS NULL OR LTRIM(RTRIM(@apyn)) = ''
@@ -142,10 +142,10 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        INSERT INTO parques.Guardaparque (dni, apyn, email, telefono, localidad, fechaNacimiento)
+        INSERT INTO personal.Guardaparque (dni, apyn, email, telefono, localidad, fechaNacimiento)
         VALUES (@dni, LTRIM(RTRIM(@apyn)), @email, @telefono, @localidad, @fechaNacimiento);
 
-        INSERT INTO parques.AsignacionGuardaparque (fechaInicio, fechaFin, motivoEgreso, idParque, dni)
+        INSERT INTO personal.AsignacionGuardaparque (fechaInicio, fechaFin, motivoEgreso, idParque, dni)
         VALUES (@fechaInicio, NULL, NULL, @idParque, @dni);
 
         COMMIT TRANSACTION;
@@ -167,7 +167,7 @@ GO
 -- una nueva en el parque destino, en una sola transaccion. Asi el
 -- guardaparque nunca queda sin asignacion ni con dos vigentes.
 -- ============================================================
-CREATE OR ALTER PROCEDURE parques.sp_ReasignarGuardaparque
+CREATE OR ALTER PROCEDURE personal.ReasignarGuardaparque
     @dni               INT,
     @idParqueDestino   INT,
     @fechaReasignacion DATE,
@@ -185,10 +185,10 @@ BEGIN
     SELECT @vIdAsignacionActual = idAsignacion,
            @vIdParqueActual     = idParque,
            @vFechaInicioActual  = fechaInicio
-    FROM parques.AsignacionGuardaparque
+    FROM personal.AsignacionGuardaparque
     WHERE dni = @dni AND fechaFin IS NULL;
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Guardaparque WHERE dni = @dni)
+    IF NOT EXISTS (SELECT 1 FROM personal.Guardaparque WHERE dni = @dni)
         SET @vErrores += '- El guardaparque indicado no existe.' + CHAR(13);
 
     IF NOT EXISTS (SELECT 1 FROM parques.Parque WHERE idParque = @idParqueDestino)
@@ -219,13 +219,13 @@ BEGIN
 
         -- 1. Cierra la asignacion vigente (antes de abrir la nueva,
         --    para no violar el indice unico de asignacion activa).
-        UPDATE parques.AsignacionGuardaparque
+        UPDATE personal.AsignacionGuardaparque
         SET fechaFin     = @fechaReasignacion,
             motivoEgreso = @motivoEgreso
         WHERE idAsignacion = @vIdAsignacionActual;
 
         -- 2. Abre la nueva asignacion en el parque destino.
-        INSERT INTO parques.AsignacionGuardaparque (fechaInicio, fechaFin, motivoEgreso, idParque, dni)
+        INSERT INTO personal.AsignacionGuardaparque (fechaInicio, fechaFin, motivoEgreso, idParque, dni)
         VALUES (@fechaReasignacion, NULL, NULL, @idParqueDestino, @dni);
 
         COMMIT TRANSACTION;
@@ -247,7 +247,7 @@ GO
 -- Cierra la asignacion vigente con fecha y motivo de egreso,
 -- sin abrir una nueva (baja definitiva del parque).
 -- ============================================================
-CREATE OR ALTER PROCEDURE parques.sp_RegistrarEgresoGuardaparque
+CREATE OR ALTER PROCEDURE personal.RegistrarEgresoGuardaparque
     @dni          INT,
     @fechaEgreso  DATE,
     @motivoEgreso VARCHAR(255)
@@ -261,10 +261,10 @@ BEGIN
 
     SELECT @vIdAsignacionActual = idAsignacion,
            @vFechaInicioActual  = fechaInicio
-    FROM parques.AsignacionGuardaparque
+    FROM personal.AsignacionGuardaparque
     WHERE dni = @dni AND fechaFin IS NULL;
 
-    IF NOT EXISTS (SELECT 1 FROM parques.Guardaparque WHERE dni = @dni)
+    IF NOT EXISTS (SELECT 1 FROM personal.Guardaparque WHERE dni = @dni)
         SET @vErrores += '- El guardaparque indicado no existe.' + CHAR(13);
 
     IF @fechaEgreso IS NULL
@@ -287,7 +287,7 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        UPDATE parques.AsignacionGuardaparque
+        UPDATE personal.AsignacionGuardaparque
         SET fechaFin     = @fechaEgreso,
             motivoEgreso = LTRIM(RTRIM(@motivoEgreso))
         WHERE idAsignacion = @vIdAsignacionActual;

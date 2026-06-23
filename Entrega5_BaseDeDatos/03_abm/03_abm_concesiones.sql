@@ -20,7 +20,7 @@ GO
 -- TIPO DE CONCESION
 -- ============================================================
 
-CREATE OR ALTER PROCEDURE concesiones.sp_TipoConsesion_Insertar
+CREATE OR ALTER PROCEDURE concesiones.TipoConsesion_Insertar
     @descripcion VARCHAR(100)
 AS
 BEGIN
@@ -47,7 +47,7 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE concesiones.sp_TipoConsesion_Eliminar
+CREATE OR ALTER PROCEDURE concesiones.TipoConsesion_Eliminar
     @idTipoConcesion INT
 AS
 BEGIN
@@ -73,7 +73,7 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE concesiones.sp_TipoConsesion_Actualizar
+CREATE OR ALTER PROCEDURE concesiones.TipoConsesion_Actualizar
     @idTipoConcesion INT,
     @descripcion     VARCHAR(100)
 AS
@@ -111,7 +111,7 @@ GO
 -- EMPRESA
 -- ============================================================
 
-CREATE OR ALTER PROCEDURE concesiones.sp_Empresa_Insertar
+CREATE OR ALTER PROCEDURE concesiones.Empresa_Insertar
     @razonSocial  VARCHAR(200),
     @cuit         VARCHAR(20),
     @contacto     VARCHAR(100) = NULL,
@@ -153,7 +153,7 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE concesiones.sp_Empresa_Eliminar
+CREATE OR ALTER PROCEDURE concesiones.Empresa_Eliminar
     @idEmpresa INT
 AS
 BEGIN
@@ -179,7 +179,7 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE concesiones.sp_Empresa_Actualizar
+CREATE OR ALTER PROCEDURE concesiones.Empresa_Actualizar
     @idEmpresa    INT,
     @razonSocial  VARCHAR(200),
     @cuit         VARCHAR(20),
@@ -236,7 +236,7 @@ GO
 -- CONCESION
 -- ============================================================
 
-CREATE OR ALTER PROCEDURE concesiones.sp_Concesion_Insertar
+CREATE OR ALTER PROCEDURE concesiones.Concesion_Insertar
     @descripcion     VARCHAR(100),
     @idTipoConcesion INT,
     @idParque        INT,
@@ -285,7 +285,7 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE concesiones.sp_Concesion_Eliminar
+CREATE OR ALTER PROCEDURE concesiones.Concesion_Eliminar
     @idConcesion INT
 AS
 BEGIN
@@ -311,7 +311,7 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE concesiones.sp_Concesion_Actualizar
+CREATE OR ALTER PROCEDURE concesiones.Concesion_Actualizar
     @idConcesion     INT,
     @descripcion     VARCHAR(100),
     @idTipoConcesion INT,
@@ -374,7 +374,7 @@ GO
 -- PAGO DE CONCESION
 -- ============================================================
 
-CREATE OR ALTER PROCEDURE concesiones.sp_PagoConcesion_Insertar
+CREATE OR ALTER PROCEDURE concesiones.PagoConcesion_Insertar
     @idConcesion INT,
     @monto       DECIMAL(18,2),
     @fechaPago   DATE,
@@ -417,7 +417,7 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE concesiones.sp_PagoConcesion_Eliminar
+CREATE OR ALTER PROCEDURE concesiones.PagoConcesion_Eliminar
     @idPagoConcesion INT
 AS
 BEGIN
@@ -435,7 +435,7 @@ BEGIN
 END
 GO
 
-CREATE OR ALTER PROCEDURE concesiones.sp_PagoConcesion_Actualizar
+CREATE OR ALTER PROCEDURE concesiones.PagoConcesion_Actualizar
     @idPagoConcesion INT,
     @monto           DECIMAL(18,2),
     @fechaPago       DATE

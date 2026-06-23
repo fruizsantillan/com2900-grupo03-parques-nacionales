@@ -29,7 +29,7 @@ GO
 --   6. Numero de ticket obligatorio
 --   7. Forma de pago obligatoria
 -- ============================================================
-CREATE OR ALTER PROCEDURE ventas.sp_RegistrarVentaEntrada
+CREATE OR ALTER PROCEDURE ventas.RegistrarVentaEntrada
     @idParque        INT,
     @idTipoVisitante INT,
     @cantidad        INT,
@@ -153,7 +153,7 @@ GO
 --   4. Nuevo valor debe ser mayor o igual a cero
 --   5. Fecha de actualizacion obligatoria
 -- ============================================================
-CREATE OR ALTER PROCEDURE ventas.sp_ActualizarPrecioEntrada
+CREATE OR ALTER PROCEDURE ventas.ActualizarPrecioEntrada
     @idParque           INT,
     @idTipoVisitante    INT,
     @nuevoValor         DECIMAL(18,2),

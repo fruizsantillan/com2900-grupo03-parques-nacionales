@@ -30,7 +30,7 @@ GO
 --   7. No puede existir otra concesion vigente para la misma
 --      combinacion empresa + parque + tipo de actividad
 -- ============================================================
-CREATE OR ALTER PROCEDURE concesiones.sp_AltaConcesionCompleta
+CREATE OR ALTER PROCEDURE concesiones.AltaConcesionCompleta
     @descripcion     VARCHAR(100),
     @idTipoConcesion INT,
     @idParque        INT,
@@ -116,7 +116,7 @@ GO
 --   6. El mes del periodo debe estar entre 1 y 12
 --   7. El anio del periodo no puede ser anterior a 2020
 -- ============================================================
-CREATE OR ALTER PROCEDURE concesiones.sp_RegistrarPagoCanon
+CREATE OR ALTER PROCEDURE concesiones.RegistrarPagoCanon
     @idConcesion INT,
     @monto       DECIMAL(18,2),
     @fechaPago   DATE,

@@ -17,98 +17,87 @@ GO
 -- TESTING: sp_TipoConsesion_Insertar / Eliminar / Actualizar
 -- ============================================================
 
-PRINT '=== TEST: TipoDeConsesion ===';
-
--- [EXITOSO] Alta de tipos
-PRINT '-- Alta exitosa';
-EXEC concesiones.sp_TipoConsesion_Insertar @descripcion = 'Gastronomia';
-EXEC concesiones.sp_TipoConsesion_Insertar @descripcion = 'Turismo aventura';
-EXEC concesiones.sp_TipoConsesion_Insertar @descripcion = 'Comercio minorista';
-
--- Evidencia
+PRINT '===== TEST 1 (OK): alta de TipoDeConsesion =====';
+EXEC concesiones.TipoConsesion_Insertar @descripcion = 'Gastronomia';
+EXEC concesiones.TipoConsesion_Insertar @descripcion = 'Turismo aventura';
+EXEC concesiones.TipoConsesion_Insertar @descripcion = 'Comercio minorista';
 SELECT * FROM concesiones.TipoDeConsesion;
 
--- [FALLIDO] Descripcion vacia
-PRINT '-- Fallo: descripcion vacia';
+PRINT '===== TEST 2 (ERROR): descripcion vacia =====';
 BEGIN TRY
-    EXEC concesiones.sp_TipoConsesion_Insertar @descripcion = '';
+    EXEC concesiones.TipoConsesion_Insertar @descripcion = '';
+    PRINT 'FALLO LA PRUEBA: se esperaba error de descripcion obligatoria.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [FALLIDO] Descripcion duplicada
-PRINT '-- Fallo: descripcion duplicada';
+PRINT '===== TEST 3 (ERROR): descripcion duplicada =====';
 BEGIN TRY
-    EXEC concesiones.sp_TipoConsesion_Insertar @descripcion = 'Gastronomia';
+    EXEC concesiones.TipoConsesion_Insertar @descripcion = 'Gastronomia';
+    PRINT 'FALLO LA PRUEBA: se esperaba error de descripcion duplicada.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [EXITOSO] Actualizacion
-PRINT '-- Actualizacion exitosa';
-EXEC concesiones.sp_TipoConsesion_Actualizar @idTipoConcesion = 3, @descripcion = 'Comercio y souvenirs';
+PRINT '===== TEST 4 (OK): actualizacion de TipoDeConsesion =====';
+EXEC concesiones.TipoConsesion_Actualizar @idTipoConcesion = 3, @descripcion = 'Comercio y souvenirs';
 SELECT * FROM concesiones.TipoDeConsesion WHERE idTipoConcesion = 3;
 
--- [FALLIDO] Actualizar ID inexistente
-PRINT '-- Fallo: ID inexistente';
+PRINT '===== TEST 5 (ERROR): actualizar ID inexistente =====';
 BEGIN TRY
-    EXEC concesiones.sp_TipoConsesion_Actualizar @idTipoConcesion = 999, @descripcion = 'Test';
+    EXEC concesiones.TipoConsesion_Actualizar @idTipoConcesion = 999, @descripcion = 'Test';
+    PRINT 'FALLO LA PRUEBA: se esperaba error de ID inexistente.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
 -- ============================================================
 -- TESTING: sp_Empresa_Insertar / Eliminar / Actualizar
 -- ============================================================
 
-PRINT '=== TEST: Empresa ===';
-
--- [EXITOSO] Alta de empresas
-PRINT '-- Alta exitosa';
-EXEC concesiones.sp_Empresa_Insertar
+PRINT '===== TEST 6 (OK): alta de Empresa =====';
+EXEC concesiones.Empresa_Insertar
     @razonSocial = 'La Cabana del Bosque S.R.L.',
     @cuit        = '30712345678',
     @contacto    = 'Carlos Fernandez',
     @email       = 'contacto@cabanabosque.com',
     @telefono    = '011-4523-9876';
 
-EXEC concesiones.sp_Empresa_Insertar
+EXEC concesiones.Empresa_Insertar
     @razonSocial = 'Aventura Patagonica S.A.',
     @cuit        = '30798765432',
     @email       = 'info@aventurapatag.com';
 
--- Evidencia
 SELECT * FROM concesiones.Empresa;
 
--- [FALLIDO] CUIT duplicado
-PRINT '-- Fallo: CUIT duplicado';
+PRINT '===== TEST 7 (ERROR): CUIT duplicado =====';
 BEGIN TRY
-    EXEC concesiones.sp_Empresa_Insertar
+    EXEC concesiones.Empresa_Insertar
         @razonSocial = 'Empresa Copia',
         @cuit        = '30712345678';
+    PRINT 'FALLO LA PRUEBA: se esperaba error de CUIT duplicado.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [FALLIDO] Multiples errores simultaneos
-PRINT '-- Fallo: multiples errores simultaneos';
+PRINT '===== TEST 8 (ERROR): multiples errores simultaneos en Empresa =====';
 BEGIN TRY
-    EXEC concesiones.sp_Empresa_Insertar
+    EXEC concesiones.Empresa_Insertar
         @razonSocial = '',
         @cuit        = '123',
         @email       = 'emailinvalido';
+    PRINT 'FALLO LA PRUEBA: se esperaban errores de razon social, CUIT y email invalidos.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [EXITOSO] Actualizacion
-PRINT '-- Actualizacion exitosa';
-EXEC concesiones.sp_Empresa_Actualizar
+PRINT '===== TEST 9 (OK): actualizacion de Empresa =====';
+EXEC concesiones.Empresa_Actualizar
     @idEmpresa   = 1,
     @razonSocial = 'La Cabana del Bosque S.R.L.',
     @cuit        = '30712345678',
@@ -120,11 +109,8 @@ SELECT * FROM concesiones.Empresa WHERE idEmpresa = 1;
 -- (Requiere idParque valido de parques.Parque)
 -- ============================================================
 
-PRINT '=== TEST: Concesion ===';
-
--- [EXITOSO] Alta de concesiones
-PRINT '-- Alta exitosa';
-EXEC concesiones.sp_Concesion_Insertar
+PRINT '===== TEST 10 (OK): alta de Concesion =====';
+EXEC concesiones.Concesion_Insertar
     @descripcion     = 'Restaurante principal - Parque Nahuel Huapi',
     @idTipoConcesion = 1,
     @idParque        = 1,
@@ -133,7 +119,7 @@ EXEC concesiones.sp_Concesion_Insertar
     @fechaFin        = '2026-12-31',
     @canonMensual    = 150000.00;
 
-EXEC concesiones.sp_Concesion_Insertar
+EXEC concesiones.Concesion_Insertar
     @descripcion     = 'Excursiones de trekking - Parque Los Glaciares',
     @idTipoConcesion = 2,
     @idParque        = 2,
@@ -142,13 +128,11 @@ EXEC concesiones.sp_Concesion_Insertar
     @fechaFin        = '2027-02-28',
     @canonMensual    = 80000.00;
 
--- Evidencia
 SELECT * FROM concesiones.Concesion;
 
--- [FALLIDO] Fecha fin anterior a inicio
-PRINT '-- Fallo: fecha fin <= fecha inicio';
+PRINT '===== TEST 11 (ERROR): fecha fin anterior a inicio =====';
 BEGIN TRY
-    EXEC concesiones.sp_Concesion_Insertar
+    EXEC concesiones.Concesion_Insertar
         @descripcion     = 'Concesion invalida',
         @idTipoConcesion = 1,
         @idParque        = 1,
@@ -156,15 +140,15 @@ BEGIN TRY
         @fechaInicio     = '2026-01-01',
         @fechaFin        = '2025-01-01',
         @canonMensual    = 50000.00;
+    PRINT 'FALLO LA PRUEBA: se esperaba error de fechas invalidas.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [FALLIDO] Empresa inexistente
-PRINT '-- Fallo: empresa no existe';
+PRINT '===== TEST 12 (ERROR): empresa inexistente =====';
 BEGIN TRY
-    EXEC concesiones.sp_Concesion_Insertar
+    EXEC concesiones.Concesion_Insertar
         @descripcion     = 'Concesion empresa fantasma',
         @idTipoConcesion = 1,
         @idParque        = 1,
@@ -172,15 +156,15 @@ BEGIN TRY
         @fechaInicio     = '2025-01-01',
         @fechaFin        = '2026-12-31',
         @canonMensual    = 50000.00;
+    PRINT 'FALLO LA PRUEBA: se esperaba error de empresa inexistente.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [FALLIDO] Canon cero
-PRINT '-- Fallo: canon = 0';
+PRINT '===== TEST 13 (ERROR): canon igual a cero =====';
 BEGIN TRY
-    EXEC concesiones.sp_Concesion_Insertar
+    EXEC concesiones.Concesion_Insertar
         @descripcion     = 'Concesion canon cero',
         @idTipoConcesion = 1,
         @idParque        = 1,
@@ -188,23 +172,23 @@ BEGIN TRY
         @fechaInicio     = '2025-01-01',
         @fechaFin        = '2026-12-31',
         @canonMensual    = 0;
+    PRINT 'FALLO LA PRUEBA: se esperaba error de canon invalido.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [FALLIDO] Baja de tipo con concesiones asociadas
-PRINT '-- Fallo: baja de tipo con concesiones asociadas';
+PRINT '===== TEST 14 (ERROR): baja de tipo con concesiones asociadas =====';
 BEGIN TRY
-    EXEC concesiones.sp_TipoConsesion_Eliminar @idTipoConcesion = 1;
+    EXEC concesiones.TipoConsesion_Eliminar @idTipoConcesion = 1;
+    PRINT 'FALLO LA PRUEBA: se esperaba bloqueo por dependencia.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [EXITOSO] Baja de concesion sin pagos
-PRINT '-- Baja exitosa (concesion sin pagos)';
-EXEC concesiones.sp_Concesion_Insertar
+PRINT '===== TEST 15 (OK): baja de concesion sin pagos =====';
+EXEC concesiones.Concesion_Insertar
     @descripcion     = 'Concesion temporal para borrar',
     @idTipoConcesion = 3,
     @idParque        = 1,
@@ -214,104 +198,98 @@ EXEC concesiones.sp_Concesion_Insertar
     @canonMensual    = 10000.00;
 
 DECLARE @vIdTemp INT = (SELECT MAX(idConcesion) FROM concesiones.Concesion);
-EXEC concesiones.sp_Concesion_Eliminar @idConcesion = @vIdTemp;
+EXEC concesiones.Concesion_Eliminar @idConcesion = @vIdTemp;
 SELECT * FROM concesiones.Concesion;
 
 -- ============================================================
 -- TESTING: sp_PagoConcesion_Insertar / Eliminar / Actualizar
 -- ============================================================
 
-PRINT '=== TEST: PagoConcesion ===';
-
--- [EXITOSO] Alta de pagos
-PRINT '-- Alta exitosa';
-EXEC concesiones.sp_PagoConcesion_Insertar
+PRINT '===== TEST 16 (OK): alta de pagos de canon =====';
+EXEC concesiones.PagoConcesion_Insertar
     @idConcesion = 1,
     @monto       = 150000.00,
     @fechaPago   = '2025-02-05',
     @periodoAnio = 2025,
     @periodoMes  = 1;
 
-EXEC concesiones.sp_PagoConcesion_Insertar
+EXEC concesiones.PagoConcesion_Insertar
     @idConcesion = 1,
     @monto       = 150000.00,
     @fechaPago   = '2025-03-03',
     @periodoAnio = 2025,
     @periodoMes  = 2;
 
--- Evidencia
 SELECT * FROM concesiones.PagoConcesion;
 
--- [FALLIDO] Pago duplicado mismo periodo
-PRINT '-- Fallo: periodo duplicado';
+PRINT '===== TEST 17 (ERROR): pago duplicado para el mismo periodo =====';
 BEGIN TRY
-    EXEC concesiones.sp_PagoConcesion_Insertar
+    EXEC concesiones.PagoConcesion_Insertar
         @idConcesion = 1,
         @monto       = 150000.00,
         @fechaPago   = '2025-02-10',
         @periodoAnio = 2025,
         @periodoMes  = 1;
+    PRINT 'FALLO LA PRUEBA: se esperaba error de periodo duplicado.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [FALLIDO] Mes invalido
-PRINT '-- Fallo: mes fuera de rango';
+PRINT '===== TEST 18 (ERROR): mes fuera de rango =====';
 BEGIN TRY
-    EXEC concesiones.sp_PagoConcesion_Insertar
+    EXEC concesiones.PagoConcesion_Insertar
         @idConcesion = 1,
         @monto       = 150000.00,
         @fechaPago   = '2025-01-05',
         @periodoAnio = 2025,
         @periodoMes  = 13;
+    PRINT 'FALLO LA PRUEBA: se esperaba error de mes invalido.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [FALLIDO] Monto negativo
-PRINT '-- Fallo: monto negativo';
+PRINT '===== TEST 19 (ERROR): monto negativo =====';
 BEGIN TRY
-    EXEC concesiones.sp_PagoConcesion_Insertar
+    EXEC concesiones.PagoConcesion_Insertar
         @idConcesion = 1,
         @monto       = -500.00,
         @fechaPago   = '2025-04-05',
         @periodoAnio = 2025,
         @periodoMes  = 3;
+    PRINT 'FALLO LA PRUEBA: se esperaba error de monto invalido.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [EXITOSO] Actualizacion de monto
-PRINT '-- Actualizacion exitosa';
-EXEC concesiones.sp_PagoConcesion_Actualizar
+PRINT '===== TEST 20 (OK): actualizacion de monto de pago =====';
+EXEC concesiones.PagoConcesion_Actualizar
     @idPagoConcesion = 1,
     @monto           = 155000.00,
     @fechaPago       = '2025-02-05';
 SELECT * FROM concesiones.PagoConcesion WHERE idPagoConcesion = 1;
 
--- [EXITOSO] Baja
-PRINT '-- Baja exitosa';
-EXEC concesiones.sp_PagoConcesion_Eliminar @idPagoConcesion = 2;
+PRINT '===== TEST 21 (OK): baja de pago =====';
+EXEC concesiones.PagoConcesion_Eliminar @idPagoConcesion = 2;
 SELECT * FROM concesiones.PagoConcesion;
 
--- [FALLIDO] Baja ID inexistente
-PRINT '-- Fallo: baja ID inexistente';
+PRINT '===== TEST 22 (ERROR): baja de pago con ID inexistente =====';
 BEGIN TRY
-    EXEC concesiones.sp_PagoConcesion_Eliminar @idPagoConcesion = 999;
+    EXEC concesiones.PagoConcesion_Eliminar @idPagoConcesion = 999;
+    PRINT 'FALLO LA PRUEBA: se esperaba error de pago inexistente.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 
--- [FALLIDO] Ahora si: baja de concesion con pagos
-PRINT '-- Fallo: baja concesion con pagos';
+PRINT '===== TEST 23 (ERROR): baja de concesion con pagos registrados =====';
 BEGIN TRY
-    EXEC concesiones.sp_Concesion_Eliminar @idConcesion = 1;
+    EXEC concesiones.Concesion_Eliminar @idConcesion = 1;
+    PRINT 'FALLO LA PRUEBA: se esperaba bloqueo por pagos asociados.';
 END TRY
 BEGIN CATCH
-    PRINT ERROR_MESSAGE();
+    PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 GO

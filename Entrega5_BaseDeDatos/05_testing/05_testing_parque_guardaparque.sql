@@ -20,13 +20,13 @@ DECLARE @idTipo INT, @idUbic INT, @idParque INT;
 
 PRINT '===== TEST 1 (OK): alta de TipoParque =====';
 -- Esperado: se crea y muestra 'Tipo de parque creado con ID: X'.
-EXEC parques.sp_TipoParque_Insertar @descripcion = 'Parque Nacional';
+EXEC parques.TipoParque_Insertar @descripcion = 'Parque Nacional';
 SELECT @idTipo = idTipoParque FROM parques.TipoParque WHERE descripcion = 'Parque Nacional';
 
 PRINT '===== TEST 2 (ERROR): TipoParque con descripcion duplicada =====';
 -- Esperado: '- Ya existe un tipo de parque con esa descripcion.'
 BEGIN TRY
-    EXEC parques.sp_TipoParque_Insertar @descripcion = 'Parque Nacional';
+    EXEC parques.TipoParque_Insertar @descripcion = 'Parque Nacional';
     PRINT 'FALLO LA PRUEBA: se esperaba error de duplicado.';
 END TRY
 BEGIN CATCH
@@ -36,7 +36,7 @@ END CATCH
 PRINT '===== TEST 3 (ERROR): TipoParque sin descripcion =====';
 -- Esperado: '- La descripcion del tipo de parque es obligatoria.'
 BEGIN TRY
-    EXEC parques.sp_TipoParque_Insertar @descripcion = '';
+    EXEC parques.TipoParque_Insertar @descripcion = '';
     PRINT 'FALLO LA PRUEBA: se esperaba error de obligatoriedad.';
 END TRY
 BEGIN CATCH
@@ -44,7 +44,7 @@ BEGIN CATCH
 END CATCH
 
 PRINT '===== TEST 4 (OK): alta de Ubicacion =====';
-EXEC parques.sp_Ubicacion_Insertar
+EXEC parques.Ubicacion_Insertar
      @direccion = 'Av. San Martin 100',
      @provincia = 'Neuquen',
      @latitud   = -40.123456,
@@ -54,7 +54,7 @@ SELECT @idUbic = idUbicacion FROM parques.Ubicacion WHERE direccion = 'Av. San M
 PRINT '===== TEST 5 (ERROR): Ubicacion con latitud fuera de rango =====';
 -- Esperado: '- La latitud debe estar entre -90 y 90.'
 BEGIN TRY
-    EXEC parques.sp_Ubicacion_Insertar
+    EXEC parques.Ubicacion_Insertar
          @direccion = 'Calle Falsa 123',
          @provincia = 'Rio Negro',
          @latitud   = 200,
@@ -66,7 +66,7 @@ BEGIN CATCH
 END CATCH
 
 PRINT '===== TEST 6 (OK): alta de Parque =====';
-EXEC parques.sp_Parque_Insertar
+EXEC parques.Parque_Insertar
      @nombre       = 'Nahuel Huapi',
      @superficie   = 7050.50,
      @idTipoParque = @idTipo,
@@ -79,7 +79,7 @@ FROM parques.Parque WHERE idParque = @idParque;
 PRINT '===== TEST 7 (ERROR): Parque con varios errores a la vez =====';
 -- Esperado: UN solo mensaje que junta superficie<=0 y tipo inexistente.
 BEGIN TRY
-    EXEC parques.sp_Parque_Insertar
+    EXEC parques.Parque_Insertar
          @nombre       = 'Parque Invalido',
          @superficie   = -5,
          @idTipoParque = 99999,
@@ -91,16 +91,16 @@ BEGIN CATCH
 END CATCH
 
 PRINT '===== TEST 8 (OK): alta de Guardaparque =====';
-EXEC parques.sp_Guardaparque_Insertar
+EXEC personal.Guardaparque_Insertar
      @dni   = 30111222,
      @apyn  = 'Perez, Juan',
      @email = 'juan.perez@parques.gob.ar';
-SELECT dni, apyn, email FROM parques.Guardaparque WHERE dni = 30111222;
+SELECT dni, apyn, email FROM personal.Guardaparque WHERE dni = 30111222;
 
 PRINT '===== TEST 9 (ERROR): Guardaparque con dni invalido y email mal formado =====';
 -- Esperado: UN solo mensaje con dni<=0 y email invalido.
 BEGIN TRY
-    EXEC parques.sp_Guardaparque_Insertar
+    EXEC personal.Guardaparque_Insertar
          @dni   = -1,
          @apyn  = 'Test',
          @email = 'no-es-un-email';
@@ -113,7 +113,7 @@ END CATCH
 PRINT '===== TEST 10 (ERROR): eliminar un TipoParque en uso =====';
 -- Esperado: '- No se puede eliminar: existen parques asociados a este tipo.'
 BEGIN TRY
-    EXEC parques.sp_TipoParque_Eliminar @idTipoParque = @idTipo;
+    EXEC parques.TipoParque_Eliminar @idTipoParque = @idTipo;
     PRINT 'FALLO LA PRUEBA: se esperaba bloqueo por dependencia.';
 END TRY
 BEGIN CATCH
@@ -121,5 +121,5 @@ BEGIN CATCH
 END CATCH
 
 PRINT '===== TEST 11 (OK): obtener Parque por ID =====';
-EXEC parques.sp_Parque_ObtenerPorId @idParque = @idParque;
+EXEC parques.Parque_ObtenerPorId @idParque = @idParque;
 GO
