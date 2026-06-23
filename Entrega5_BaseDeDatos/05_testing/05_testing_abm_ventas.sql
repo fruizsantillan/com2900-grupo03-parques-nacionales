@@ -52,7 +52,7 @@ VALUES ('Parque Nacional Iguazu', 67200.00, @idTipoParque, @idUbicacion);
 
 SET @idParque = SCOPE_IDENTITY();
 
-INSERT INTO parques.Tour (nombre, descripcion, duracion, cupoMaximo, precio, idParque)
+INSERT INTO actividades.Tour (nombre, descripcion, duracion, cupoMaximo, precio, idParque)
 VALUES ('Tour Cataratas', 'Recorrido por las cataratas', 120, 30, 5000.00, @idParque);
 
 SET @idTour = SCOPE_IDENTITY();

@@ -8,7 +8,7 @@
 -- =============================================
 
 -- ============================================================
--- Testing ABM: Parques y Guardaparques
+-- 05_testing_parque_guardaparque.sql
 -- ============================================================
 
 -- =============================================
@@ -137,8 +137,9 @@ PRINT '===== TEST 11 (OK): obtener Parque por ID =====';
 EXEC parques.Parque_ObtenerPorId @idParque = @idParque;
 GO
 
+
 -- ============================================================
--- Testing NEGOCIO: Parques y Guardaparques
+-- 05_testing_negocio_parque_guardaparque.sql
 -- ============================================================
 
 -- =============================================
@@ -287,8 +288,9 @@ BEGIN CATCH
 END CATCH
 GO
 
+
 -- ============================================================
--- Testing ABM: Guias, Tours y Atracciones
+-- 05_testing_guias_tour_atracciones.sql
 -- ============================================================
 
 -- =============================================
@@ -399,8 +401,9 @@ BEGIN CATCH
 END CATCH
 GO
 
+
 -- ============================================================
--- Testing ABM: Concesiones
+-- 05_testing_abm_concesiones.sql
 -- ============================================================
 
 -- =============================================
@@ -699,8 +702,9 @@ BEGIN CATCH
 END CATCH
 GO
 
+
 -- ============================================================
--- Testing NEGOCIO: Concesiones
+-- 05_testing_negocio_concesiones.sql
 -- ============================================================
 
 -- =============================================
@@ -985,8 +989,9 @@ WHERE c.fechaFin >= CAST(GETDATE() AS DATE)
   );
 GO
 
+
 -- ============================================================
--- Testing ABM: Ventas
+-- 05_testing_abm_ventas.sql
 -- ============================================================
 
 -- =============================================
@@ -1043,7 +1048,7 @@ VALUES ('Parque Nacional Iguazu', 67200.00, @idTipoParque, @idUbicacion);
 
 SET @idParque = SCOPE_IDENTITY();
 
-INSERT INTO parques.Tour (nombre, descripcion, duracion, cupoMaximo, precio, idParque)
+INSERT INTO actividades.Tour (nombre, descripcion, duracion, cupoMaximo, precio, idParque)
 VALUES ('Tour Cataratas', 'Recorrido por las cataratas', 120, 30, 5000.00, @idParque);
 
 SET @idTour = SCOPE_IDENTITY();
@@ -1494,8 +1499,9 @@ BEGIN CATCH
     PRINT 'OK (error esperado): ' + ERROR_MESSAGE();
 END CATCH
 GO
+
 -- ============================================================
--- Testing NEGOCIO: Ventas
+-- 05_testing_negocio_ventas.sql
 -- ============================================================
 
 -- =============================================
