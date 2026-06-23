@@ -1,4 +1,10 @@
 -- =============================================
+-- Universidad: Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Comisión: 01-2900 | Grupo 03
+-- Integrantes: Del Vecchio Fabrizio, Ocampos Horacio,
+--              Ruiz Santillán Facundo, Lago Franco Nehuen
+-- Fecha: 15/06/2026
 -- Descripción: SPs de lógica de negocio - Guías, Tours y Atracciones
 -- =============================================
 
@@ -9,7 +15,7 @@ GO
 -- SP NEGOCIO: Asignar guía a tour
 -- Valida: vigencia, superposición de fechas
 -- ==========================================
-CREATE OR ALTER PROCEDURE parques.sp_AsignarGuiaATour
+CREATE OR ALTER PROCEDURE personal.AsignarGuiaATour
     @idTour      INT,
     @dniGuia     INT,
     @fechaInicio DATE,
@@ -21,30 +27,32 @@ BEGIN
     DECLARE @vVigencia DATE;
 
     -- Validar que el tour existe
-    IF NOT EXISTS (SELECT 1 FROM parques.Tour WHERE idTour = @idTour)
-        SET @vErrores = @vErrores + '- El tour especificado no existe.' + CHAR(13);
+    IF NOT EXISTS (SELECT 1 FROM actividades.Tour WHERE idTour = @idTour)
+        SET @vErrores += '- El tour especificado no existe.' + CHAR(13);
 
     -- Validar que el guía existe
-    IF NOT EXISTS (SELECT 1 FROM parques.Guia WHERE dni = @dniGuia)
-        SET @vErrores = @vErrores + '- El guía especificado no existe.' + CHAR(13);
+    IF NOT EXISTS (SELECT 1 FROM personal.Guia WHERE dni = @dniGuia)
+        SET @vErrores += '- El guía especificado no existe.' + CHAR(13);
 
     -- Validar fechas
-    IF @fechaFin < @fechaInicio
-        SET @vErrores = @vErrores + '- La fecha de fin no puede ser anterior a la fecha de inicio.' + CHAR(13);
+    IF @fechaInicio IS NULL OR @fechaFin IS NULL
+        SET @vErrores += '- Las fechas de inicio y fin son obligatorias.' + CHAR(13);
+    IF @fechaInicio IS NOT NULL AND @fechaFin IS NOT NULL AND @fechaFin < @fechaInicio
+        SET @vErrores += '- La fecha de fin no puede ser anterior a la fecha de inicio.' + CHAR(13);
 
     -- Validar vigencia de autorización del guía
-    SELECT @vVigencia = vigenciaAutorizacion FROM parques.Guia WHERE dni = @dniGuia;
-    IF @vVigencia < @fechaFin
-        SET @vErrores = @vErrores + '- La autorización del guía vence antes de que finalice la asignación.' + CHAR(13);
+    SELECT @vVigencia = vigenciaAutorizacion FROM personal.Guia WHERE dni = @dniGuia;
+    IF @vVigencia IS NOT NULL AND @fechaFin IS NOT NULL AND @vVigencia < @fechaFin
+        SET @vErrores += '- La autorización del guía vence antes de que finalice la asignación.' + CHAR(13);
 
     -- Validar superposición de fechas para ese guía
-    IF EXISTS (
-        SELECT 1 FROM parques.AsignacionGuia
+    IF @dniGuia IS NOT NULL AND @fechaInicio IS NOT NULL AND @fechaFin IS NOT NULL AND EXISTS (
+        SELECT 1 FROM personal.AsignacionGuia
         WHERE dniGuia = @dniGuia
           AND @fechaInicio <= fechaFin
           AND @fechaFin >= fechaInicio
     )
-        SET @vErrores = @vErrores + '- El guía ya tiene una asignación en ese período de fechas.' + CHAR(13);
+        SET @vErrores += '- El guía ya tiene una asignación en ese período de fechas.' + CHAR(13);
 
     IF @vErrores != ''
     BEGIN
@@ -54,7 +62,7 @@ BEGIN
 
     BEGIN TRANSACTION;
     BEGIN TRY
-        INSERT INTO parques.AsignacionGuia (idTour, dniGuia, fechaInicio, fechaFin)
+        INSERT INTO personal.AsignacionGuia (idTour, dniGuia, fechaInicio, fechaFin)
         VALUES (@idTour, @dniGuia, @fechaInicio, @fechaFin);
 
         COMMIT TRANSACTION;
@@ -69,7 +77,7 @@ GO
 -- ==========================================
 -- SP NEGOCIO: Registrar atracción en un parque
 -- ==========================================
-CREATE OR ALTER PROCEDURE parques.sp_RegistrarAtraccion
+CREATE OR ALTER PROCEDURE actividades.RegistrarAtraccion
     @nombre         VARCHAR(100),
     @descripcion    VARCHAR(255) = NULL,
     @tipo           VARCHAR(50)  = NULL,
@@ -83,15 +91,15 @@ BEGIN
     DECLARE @vErrores VARCHAR(500) = '';
 
     IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
-        SET @vErrores = @vErrores + '- El nombre de la atracción es obligatorio.' + CHAR(13);
+        SET @vErrores += '- El nombre de la atracción es obligatorio.' + CHAR(13);
     IF @duracion IS NULL OR @duracion <= 0
-        SET @vErrores = @vErrores + '- La duración debe ser mayor a 0 minutos.' + CHAR(13);
+        SET @vErrores += '- La duración debe ser mayor a 0 minutos.' + CHAR(13);
     IF @cupoMaximo IS NULL OR @cupoMaximo <= 0
-        SET @vErrores = @vErrores + '- El cupo máximo debe ser mayor a 0.' + CHAR(13);
-    IF @precio < 0
-        SET @vErrores = @vErrores + '- El precio no puede ser negativo.' + CHAR(13);
+        SET @vErrores += '- El cupo máximo debe ser mayor a 0.' + CHAR(13);
+    IF @precio IS NULL OR @precio < 0
+        SET @vErrores += '- El precio no puede ser negativo.' + CHAR(13);
     IF NOT EXISTS (SELECT 1 FROM parques.Parque WHERE idParque = @idParque)
-        SET @vErrores = @vErrores + '- El parque especificado no existe.' + CHAR(13);
+        SET @vErrores += '- El parque especificado no existe.' + CHAR(13);
 
     IF @vErrores != ''
     BEGIN
@@ -101,7 +109,7 @@ BEGIN
 
     BEGIN TRANSACTION;
     BEGIN TRY
-        INSERT INTO parques.Atraccion (nombre, descripcion, tipo, precio, duracion, cupoMaximo, idParque)
+        INSERT INTO actividades.Atraccion (nombre, descripcion, tipo, precio, duracion, cupoMaximo, idParque)
         VALUES (@nombre, @descripcion, @tipo, @precio, @duracion, @cupoMaximo, @idParque);
 
         COMMIT TRANSACTION;
