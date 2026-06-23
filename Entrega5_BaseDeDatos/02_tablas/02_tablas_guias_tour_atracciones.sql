@@ -14,9 +14,9 @@ GO
 -- GUIA
 IF NOT EXISTS (SELECT 1 FROM sys.tables t 
                JOIN sys.schemas s ON t.schema_id = s.schema_id
-               WHERE t.name = 'Guia' AND s.name = 'parques')
+               WHERE t.name = 'Guia' AND s.name = 'personal')
 BEGIN
-    CREATE TABLE parques.Guia (
+    CREATE TABLE personal.Guia (
         dni                    INT                NOT NULL,
         apyn                   VARCHAR(100)       NOT NULL,
         especialidad           VARCHAR(100)       NULL,
@@ -31,9 +31,9 @@ GO
 -- TOUR
 IF NOT EXISTS (SELECT 1 FROM sys.tables t 
                JOIN sys.schemas s ON t.schema_id = s.schema_id
-               WHERE t.name = 'Tour' AND s.name = 'parques')
+               WHERE t.name = 'Tour' AND s.name = 'actividades')
 BEGIN
-    CREATE TABLE parques.Tour (
+    CREATE TABLE actividades.Tour (
         idTour      INT IDENTITY(1,1)   NOT NULL,
         nombre      VARCHAR(100)        NOT NULL,
         descripcion VARCHAR(255)        NULL,
@@ -53,9 +53,9 @@ GO
 -- ATRACCION
 IF NOT EXISTS (SELECT 1 FROM sys.tables t 
                JOIN sys.schemas s ON t.schema_id = s.schema_id
-               WHERE t.name = 'Atraccion' AND s.name = 'parques')
+               WHERE t.name = 'Atraccion' AND s.name = 'actividades')
 BEGIN
-    CREATE TABLE parques.Atraccion (
+    CREATE TABLE actividades.Atraccion (
         idAtraccion     INT IDENTITY(1,1)   NOT NULL,
         nombre          VARCHAR(100)        NOT NULL,
         descripcion     VARCHAR(255)        NULL,
@@ -76,18 +76,18 @@ GO
 -- ASIGNACION GUIA
 IF NOT EXISTS (SELECT 1 FROM sys.tables t 
                JOIN sys.schemas s ON t.schema_id = s.schema_id
-               WHERE t.name = 'AsignacionGuia' AND s.name = 'parques')
+               WHERE t.name = 'AsignacionGuia' AND s.name = 'personal')
 BEGIN
-    CREATE TABLE parques.AsignacionGuia (
+    CREATE TABLE personal.AsignacionGuia (
         idAsignacion    INT IDENTITY(1,1)   NOT NULL,
         idTour          INT                 NOT NULL,
         dniGuia         INT                 NOT NULL,
         fechaInicio     DATE                NOT NULL,
         fechaFin        DATE                NOT NULL,
-        CONSTRAINT PK_AsignacionGuia            PRIMARY KEY (idAsignacion),
-        CONSTRAINT FK_AsignacionGuia_Tour       FOREIGN KEY (idTour) REFERENCES parques.Tour(idTour),
-        CONSTRAINT FK_AsignacionGuia_dniGuia       FOREIGN KEY (dniGuia) REFERENCES parques.Guia(dni),
-        CONSTRAINT CHK_AsignacionGuia_fechas    CHECK (fechaFin >= fechaInicio)
+        CONSTRAINT PK_AsignacionGuia         PRIMARY KEY (idAsignacion),
+        CONSTRAINT FK_AsignacionGuia_Tour    FOREIGN KEY (idTour) REFERENCES actividades.Tour(idTour),
+        CONSTRAINT FK_AsignacionGuia_dniGuia FOREIGN KEY (dniGuia) REFERENCES personal.Guia(dni),
+        CONSTRAINT CHK_AsignacionGuia_fechas CHECK (fechaFin >= fechaInicio)
     );
 END
 GO
