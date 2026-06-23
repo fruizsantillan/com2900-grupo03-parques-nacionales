@@ -292,7 +292,6 @@ BEGIN
 
         BEGIN TRY
             EXEC ventas.PrecioEntrada_Insertar
-                @fechaActualizacion = @vFechaSeed,
                 @valor              = @vValorSeed,
                 @idParque           = @vIdParqueSeed,
                 @idTipoVisitante    = @vIdTVSeed,

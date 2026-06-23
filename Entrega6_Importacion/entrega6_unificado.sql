@@ -5,11 +5,6 @@
 -- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
 -- Fecha: 15/06/2026
 -- Descripcion: Script unificado Entrega 6.
---   Cada SP de importacion popula directamente las tablas de E5 que corresponda:
---     sp_ImportarVisitasNacionales  -> EstadisticaVisitas + TipoVisitante
---     sp_ImportarAreasProtegidas    -> TipoParque + Parque + TipoVisitante + PrecioEntrada
---     sp_ImportarAreasWDPA          -> TipoParque + Parque + TipoVisitante + PrecioEntrada
---     sp_ImportarTipoCambio         -> TipoCambio + actualiza PrecioEntrada (No Residente)
 -- =============================================
 
 -- ============================================================
@@ -1374,7 +1369,6 @@ BEGIN
 
         BEGIN TRY
             EXEC ventas.PrecioEntrada_Insertar
-                @fechaActualizacion = @vFechaSeed,
                 @valor              = @vValorSeed,
                 @idParque           = @vIdParqueSeed,
                 @idTipoVisitante    = @vIdTVSeed,
@@ -1695,7 +1689,6 @@ BEGIN
 
         BEGIN TRY
             EXEC ventas.PrecioEntrada_Insertar
-                @fechaActualizacion = @vFechaSeed,
                 @valor              = @vValorSeed,
                 @idParque           = @vIdParqueSeed,
                 @idTipoVisitante    = @vIdTVSeed,
