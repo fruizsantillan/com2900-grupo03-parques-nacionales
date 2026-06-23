@@ -1053,7 +1053,7 @@ VALUES ('Tour Cataratas', 'Recorrido por las cataratas', 120, 30, 5000.00, @idPa
 
 SET @idTour = SCOPE_IDENTITY();
 
-INSERT INTO parques.Atraccion (nombre, descripcion, tipo, precio, duracion, cupoMaximo, idParque)
+INSERT INTO actividades.Atraccion (nombre, descripcion, tipo, precio, duracion, cupoMaximo, idParque)
 VALUES ('Garganta del Diablo', 'Atraccion principal', 'Natural', 3000.00, 90, 50, @idParque);
 
 SET @idAtraccion = SCOPE_IDENTITY();
