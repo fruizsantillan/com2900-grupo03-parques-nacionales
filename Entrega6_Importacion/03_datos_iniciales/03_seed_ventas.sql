@@ -1,0 +1,11 @@
+-- =============================================
+-- NOTA: El seed de ventas.TipoVisitante y ventas.PrecioEntrada
+-- fue integrado directamente en los SPs de importacion:
+--
+--   sp_ImportarVisitasNacionales  -> seed ventas.TipoVisitante
+--   sp_ImportarAreasProtegidas    -> seed ventas.TipoVisitante + ventas.PrecioEntrada
+--   sp_ImportarAreasWDPA          -> seed ventas.TipoVisitante + ventas.PrecioEntrada
+--   sp_ImportarTipoCambio         -> actualiza ventas.PrecioEntrada (No Residente)
+--
+-- Este archivo se mantiene vacio intencionalmente.
+-- =============================================

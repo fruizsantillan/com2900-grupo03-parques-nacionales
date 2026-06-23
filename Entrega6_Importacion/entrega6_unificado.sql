@@ -4,100 +4,90 @@
 -- Grupo: 03
 -- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
 -- Fecha: 15/06/2026
--- Descripcion: Script unificado Entrega 6 - Staging, tablas finales y SPs de importacion CSV y API.
+-- Descripcion: Script unificado Entrega 6.
+--   Cada SP de importacion popula directamente las tablas de E5 que corresponda:
+--     sp_ImportarVisitasNacionales  -> EstadisticaVisitas + TipoVisitante
+--     sp_ImportarAreasProtegidas    -> TipoParque + Parque + TipoVisitante + PrecioEntrada
+--     sp_ImportarAreasWDPA          -> TipoParque + Parque + TipoVisitante + PrecioEntrada
+--     sp_ImportarTipoCambio         -> TipoCambio + actualiza PrecioEntrada (No Residente)
+-- =============================================
+
+-- ============================================================
+-- 01 - TABLAS: LogImportacion y estadisticas
+-- ============================================================
+
+-- =============================================
+-- Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Grupo: 03
+-- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
+-- Fecha: 15/06/2026
+-- Descripcion: Tablas finales de estadisticas y log de importacion.
+--              Las tablas de staging son tablas temporales (#) creadas
+--              dentro de cada SP de importacion y destruidas al finalizar.
+--
+-- Datasets cubiertos:
+--   CSV 1: visitas-residentes-y-no-residentes.csv         -> parques.EstadisticaVisitas
+--   CSV 2: visitas-residentes-y-no-residentes-por-region  -> parques.EstadisticaVisitasPorRegion
+--   CSV 3: aprn_h_ubicacion_superycatint_ha.csv           -> parques.TipoParque / parques.Parque
+--   CSV 4: aprn_i_visitas_porc_2024.csv                   -> parques.EstadisticaVisitasAnual
+--   CSV 5: WDPA_WDOECM_Jun2026_Public_ARG_csv.csv         -> parques.TipoParque / parques.Parque
+--   JSON : API ArgentinaDatos /v1/feriados/{anio}         -> parques.Feriado
+--   JSON : API dolarapi.com /v1/dolares/{tipo}            -> parques.TipoCambio
 -- =============================================
 
 USE ParquesNacionales;
 GO
 
-
 -- ============================================================
--- STAGING - Tablas de landing zone y tablas finales
+-- LOG DE IMPORTACION
+-- Registra cada ejecucion de un SP de importacion:
+--   fecha/hora, procedimiento, archivo fuente y contadores.
 -- ============================================================
-
---              finales de estadisticas de visitas, feriados y areas protegidas.
---              Las tablas staging reciben los datos tal como vienen del CSV, sin
---              transformar; los SPs de importacion limpian y cargan las tablas finales.
---
--- Datasets cubiertos:
---   CSV 1: visitas-residentes-y-no-residentes.csv         (separador ,  - datos.yvera.gob.ar)
---   CSV 2: visitas-residentes-y-no-residentes-por-region.csv (sep ,  - datos.yvera.gob.ar)
---   CSV 3: aprn_h_ubicacion_superycatint_ha.csv           (separador ;  - datos.gob.ar APN)
---   CSV 4: aprn_i_visitas_porc_2024.csv                   (separador ;  - datos.gob.ar APN)
---   JSON : API ArgentinaDatos /v1/feriados/{anio}         (HTTP REST)
-
-GO
-
--- Schema staging (landing zone): se crea si no existe
-IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'staging')
-    EXEC ('CREATE SCHEMA staging');
-GO
-
--- STAGING: reciben exactamente las columnas del CSV
--- Se truncan antes de cada carga (no son persistentes)
-
--- Staging para: visitas-residentes-y-no-residentes.csv
-IF OBJECT_ID('staging.VisitasNacionales', 'U') IS NOT NULL
-    DROP TABLE staging.VisitasNacionales;
-GO
-
-CREATE TABLE staging.VisitasNacionales (
-    indiceTiempo      VARCHAR(20)   NULL,  -- raw: "2008-1-01"
-    origenVisitantes  VARCHAR(50)   NULL,  -- residentes / no residentes / total
-    visitas           VARCHAR(20)   NULL,  -- numerico como texto por si hay nulos
-    observaciones     VARCHAR(500)  NULL
-);
-GO
-
--- Staging para: visitas-residentes-y-no-residentes-por-region.csv
-IF OBJECT_ID('staging.VisitasPorRegion', 'U') IS NOT NULL
-    DROP TABLE staging.VisitasPorRegion;
-GO
-
-CREATE TABLE staging.VisitasPorRegion (
-    indiceTiempo      VARCHAR(20)   NULL,  -- raw: "2008-1-01"
-    regionDestino     VARCHAR(100)  NULL,  -- buenos aires / cordoba / cuyo / litoral / norte / patagonia
-    origenVisitantes  VARCHAR(50)   NULL,  -- residentes / no residentes / total
-    visitas           VARCHAR(20)   NULL,
-    observaciones     VARCHAR(500)  NULL
-);
-GO
-
--- Staging para: feriados (respuesta JSON de ArgentinaDatos API)
--- La API devuelve: { "fecha": "YYYY-MM-DD", "tipo": "...", "nombre": "..." }
--- El SP de importacion carga fila por fila desde el cursor de OA
-IF OBJECT_ID('staging.Feriados', 'U') IS NOT NULL
-    DROP TABLE staging.Feriados;
-GO
-
-CREATE TABLE staging.Feriados (
-    fecha   VARCHAR(10)   NULL,  -- raw: "2025-01-01"
-    tipo    VARCHAR(100)  NULL,  -- inamovible / trasladable / puente / nolaborable
-    nombre  VARCHAR(200)  NULL
-);
-GO
-
--- TABLAS FINALES: destino de la importacion
--- Se crean en el schema parques junto con el resto del modelo
-
--- Estadisticas mensuales de visitas a nivel nacional
-IF OBJECT_ID('parques.EstadisticaVisitas', 'U') IS NULL
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'LogImportacion' AND s.name = 'parques')
 BEGIN
-    CREATE TABLE parques.EstadisticaVisitas (
-        idEstadistica     INT           IDENTITY(1,1)  NOT NULL,
-        periodo           DATE                         NOT NULL,  -- primer dia del mes
-        origenVisitante   VARCHAR(50)                  NOT NULL,  -- residentes / no residentes / total
-        cantidadVisitas   INT                          NOT NULL,
-        observaciones     VARCHAR(500)                 NULL,
-        CONSTRAINT PK_EstadisticaVisitas              PRIMARY KEY (idEstadistica),
-        CONSTRAINT UQ_EstadisticaVisitas_periodo      UNIQUE      (periodo, origenVisitante),
-        CONSTRAINT CHK_EstadisticaVisitas_visitas     CHECK       (cantidadVisitas >= 0)
+    CREATE TABLE parques.LogImportacion (
+        idLog          INT           IDENTITY(1,1)  NOT NULL,
+        fechaHora      DATETIME                     NOT NULL DEFAULT GETDATE(),
+        procedimiento  VARCHAR(200)                 NOT NULL,
+        archivoFuente  VARCHAR(500)                 NULL,
+        totalLeido     INT                          NOT NULL DEFAULT 0,
+        insertados     INT                          NOT NULL DEFAULT 0,
+        actualizados   INT                          NOT NULL DEFAULT 0,
+        errores        INT                          NOT NULL DEFAULT 0,
+        CONSTRAINT PK_LogImportacion PRIMARY KEY (idLog)
     );
 END
 GO
 
--- Estadisticas mensuales de visitas por region
-IF OBJECT_ID('parques.EstadisticaVisitasPorRegion', 'U') IS NULL
+-- ============================================================
+-- TABLAS FINALES: estadisticas nacionales de visitas
+-- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'EstadisticaVisitas' AND s.name = 'parques')
+BEGIN
+    CREATE TABLE parques.EstadisticaVisitas (
+        idEstadistica     INT           IDENTITY(1,1)  NOT NULL,
+        periodo           DATE                         NOT NULL,
+        origenVisitante   VARCHAR(50)                  NOT NULL,
+        cantidadVisitas   INT                          NOT NULL,
+        observaciones     VARCHAR(500)                 NULL,
+        CONSTRAINT PK_EstadisticaVisitas         PRIMARY KEY (idEstadistica),
+        CONSTRAINT UQ_EstadisticaVisitas_periodo UNIQUE      (periodo, origenVisitante),
+        CONSTRAINT CHK_EstadisticaVisitas_visitas CHECK      (cantidadVisitas >= 0)
+    );
+END
+GO
+
+-- ============================================================
+-- TABLAS FINALES: estadisticas de visitas por region
+-- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'EstadisticaVisitasPorRegion' AND s.name = 'parques')
 BEGIN
     CREATE TABLE parques.EstadisticaVisitasPorRegion (
         idEstadistica       INT           IDENTITY(1,1)  NOT NULL,
@@ -106,173 +96,124 @@ BEGIN
         origenVisitante     VARCHAR(50)                  NOT NULL,
         cantidadVisitas     INT                          NOT NULL,
         observaciones       VARCHAR(500)                 NULL,
-        CONSTRAINT PK_EstadisticaVisitasPorRegion          PRIMARY KEY (idEstadistica),
-        CONSTRAINT UQ_EstadisticaVisitasPorRegion_periodo  UNIQUE      (periodo, region, origenVisitante),
-        CONSTRAINT CHK_EstadisticaVisitasPorRegion_visitas CHECK       (cantidadVisitas >= 0)
+        CONSTRAINT PK_EstadisticaVisitasPorRegion         PRIMARY KEY (idEstadistica),
+        CONSTRAINT UQ_EstadisticaVisitasPorRegion_periodo UNIQUE      (periodo, region, origenVisitante),
+        CONSTRAINT CHK_EstadisticaVisitasPorRegion_visitas CHECK      (cantidadVisitas >= 0)
     );
 END
 GO
 
--- Feriados nacionales argentinos
-IF OBJECT_ID('parques.Feriado', 'U') IS NULL
+-- ============================================================
+-- TABLAS FINALES: feriados nacionales
+-- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'Feriado' AND s.name = 'parques')
 BEGIN
     CREATE TABLE parques.Feriado (
         idFeriado   INT           IDENTITY(1,1)  NOT NULL,
         fecha       DATE                         NOT NULL,
         tipo        VARCHAR(100)                 NULL,
         nombre      VARCHAR(200)                 NOT NULL,
-        CONSTRAINT PK_Feriado        PRIMARY KEY (idFeriado),
-        CONSTRAINT UQ_Feriado_fecha  UNIQUE      (fecha)
+        CONSTRAINT PK_Feriado       PRIMARY KEY (idFeriado),
+        CONSTRAINT UQ_Feriado_fecha UNIQUE      (fecha)
     );
 END
 GO
 
--- STAGING para: aprn_h_ubicacion_superycatint_ha.csv
-IF OBJECT_ID('staging.AreasProtegidas', 'U') IS NOT NULL
-    DROP TABLE staging.AreasProtegidas;
-GO
-
-CREATE TABLE staging.AreasProtegidas (
-    region                  VARCHAR(100)  NULL,  -- Centro / Nea / Noa / Patagonia norte / etc.
-    areaProtegida           VARCHAR(200)  NULL,  -- nombre oficial del area
-    hectareas               VARCHAR(20)   NULL,  -- superficie como texto (puede tener puntos de miles)
-    categoriaInternacional  VARCHAR(200)  NULL   -- Patrimonio Mundial / Sitio Ramsar / etc.
-);
-GO
-
--- STAGING para: aprn_i_visitas_porc_2024.csv
-IF OBJECT_ID('staging.VisitasPorcentajeAnual', 'U') IS NOT NULL
-    DROP TABLE staging.VisitasPorcentajeAnual;
-GO
-
-CREATE TABLE staging.VisitasPorcentajeAnual (
-    anio                    VARCHAR(10)  NULL,
-    residentesPorcentaje    VARCHAR(10)  NULL,  -- ej: "59.26"
-    noResidentesPorcentaje  VARCHAR(10)  NULL   -- ej: "40.74"
-);
-GO
-
--- TABLA FINAL: estadisticas anuales de distribucion de visitas
-IF OBJECT_ID('parques.EstadisticaVisitasAnual', 'U') IS NULL
+-- ============================================================
+-- TABLAS FINALES: distribucion anual de visitas (%)
+-- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'EstadisticaVisitasAnual' AND s.name = 'parques')
 BEGIN
     CREATE TABLE parques.EstadisticaVisitasAnual (
         idEstadistica           INT             IDENTITY(1,1)  NOT NULL,
         anio                    INT                            NOT NULL,
         residentesPorcentaje    DECIMAL(5,2)                   NOT NULL,
         noResidentesPorcentaje  DECIMAL(5,2)                   NOT NULL,
-        CONSTRAINT PK_EstadisticaVisitasAnual       PRIMARY KEY (idEstadistica),
-        CONSTRAINT UQ_EstadisticaVisitasAnual_anio  UNIQUE      (anio),
-        CONSTRAINT CHK_EstadisticaVisitasAnual_sum  CHECK       (residentesPorcentaje + noResidentesPorcentaje BETWEEN 99.90 AND 100.10)
+        CONSTRAINT PK_EstadisticaVisitasAnual      PRIMARY KEY (idEstadistica),
+        CONSTRAINT UQ_EstadisticaVisitasAnual_anio UNIQUE      (anio),
+        CONSTRAINT CHK_EstadisticaVisitasAnual_sum CHECK       (residentesPorcentaje + noResidentesPorcentaje BETWEEN 99.90 AND 100.10)
     );
 END
 GO
 
--- STAGING para: WDPA_WDOECM_Jun2026_Public_ARG_csv.csv
--- 34 columnas del CSV, todas como VARCHAR para aceptar cualquier valor raw.
---   GIS_AREA (km²), STATUS_YR, MANG_AUTH
--- Separador: coma (,). BOM UTF-8.
-IF OBJECT_ID('staging.AreasWDPA', 'U') IS NOT NULL
-    DROP TABLE staging.AreasWDPA;
-GO
-
-CREATE TABLE staging.AreasWDPA (
-    tipo          VARCHAR(20)    NULL,  -- Polygon / Point
-    siteId        VARCHAR(20)    NULL,
-    sitePid       VARCHAR(20)    NULL,
-    siteType      VARCHAR(10)    NULL,  -- PA / OECM
-    nameEng       VARCHAR(300)   NULL,
-    name          VARCHAR(300)   NULL,  -- nombre en español ← clave
-    desig         VARCHAR(200)   NULL,  -- Parque Nacional / Reserva Natural / etc.
-    designEng     VARCHAR(200)   NULL,
-    desigType     VARCHAR(50)    NULL,  -- National / Sub-national / etc.
-    iucnCat       VARCHAR(20)    NULL,  -- Ia, Ib, II, III, IV, V, VI, Not Applicable
-    intCrit       VARCHAR(100)   NULL,
-    realm         VARCHAR(50)    NULL,
-    repMArea      VARCHAR(30)    NULL,
-    gisMArea      VARCHAR(30)    NULL,
-    repArea       VARCHAR(30)    NULL,
-    gisArea       VARCHAR(30)    NULL,  -- superficie en km² ← clave
-    noTake        VARCHAR(50)    NULL,
-    noTkArea      VARCHAR(30)    NULL,
-    status        VARCHAR(50)    NULL,  -- Designated / Proposed / etc.
-    statusYr      VARCHAR(10)    NULL,  -- año de designacion ← clave
-    govType       VARCHAR(200)   NULL,
-    govSubtype    VARCHAR(200)   NULL,
-    ownType       VARCHAR(200)   NULL,
-    ownSubtype    VARCHAR(200)   NULL,
-    mangAuth      VARCHAR(300)   NULL,  -- Administracion de Parques Nacionales
-    mangPlan      VARCHAR(500)   NULL,
-    verif         VARCHAR(50)    NULL,
-    metadataId    VARCHAR(20)    NULL,
-    prntIso3      VARCHAR(10)    NULL,
-    iso3          VARCHAR(10)    NULL,
-    suppInfo      VARCHAR(500)   NULL,
-    consObj       VARCHAR(500)   NULL,
-    inlndWtrs     VARCHAR(50)    NULL,
-    oecmAsmt      VARCHAR(50)    NULL
-);
-GO
-
--- TABLA FINAL: tipo de cambio diario
--- Tipos: oficial, blue, tarjeta, mayorista, bolsa, cripto
--- Uso: calcular ingresos en moneda extranjera (Entrega 7)
-IF OBJECT_ID('parques.TipoCambio', 'U') IS NULL
+-- ============================================================
+-- TABLAS FINALES: tipo de cambio USD/ARS
+-- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'TipoCambio' AND s.name = 'parques')
 BEGIN
     CREATE TABLE parques.TipoCambio (
         idTipoCambio  INT            IDENTITY(1,1)  NOT NULL,
         fecha         DATE                          NOT NULL,
-        tipo          VARCHAR(20)                   NOT NULL,  -- oficial / blue / tarjeta
+        tipo          VARCHAR(20)                   NOT NULL,
         compra        DECIMAL(10,2)                 NOT NULL,
         venta         DECIMAL(10,2)                 NOT NULL,
-        CONSTRAINT PK_TipoCambio             PRIMARY KEY (idTipoCambio),
-        CONSTRAINT UQ_TipoCambio_fechaTipo   UNIQUE      (fecha, tipo),
-        CONSTRAINT CHK_TipoCambio_compra     CHECK       (compra > 0),
-        CONSTRAINT CHK_TipoCambio_venta      CHECK       (venta >= compra)
+        CONSTRAINT PK_TipoCambio           PRIMARY KEY (idTipoCambio),
+        CONSTRAINT UQ_TipoCambio_fechaTipo UNIQUE      (fecha, tipo),
+        CONSTRAINT CHK_TipoCambio_compra   CHECK       (compra > 0),
+        CONSTRAINT CHK_TipoCambio_venta    CHECK       (venta >= compra)
     );
 END
 GO
 
-PRINT 'Tablas de staging y tablas finales creadas correctamente.';
+PRINT 'Tablas finales y log de importacion creados correctamente.';
 GO
 
-GO
-
-
 -- ============================================================
--- IMPORTACION - Visitas nacionales mensuales (CSV)
+-- 02 - IMPORTACION: Visitas nacionales (CSV)
 -- ============================================================
 
+-- =============================================
+-- Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Grupo: 03
+-- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
+-- Fecha: 15/06/2026
+-- Descripcion: Importacion de visitas nacionales desde CSV.
+--   Fuente: visitas-residentes-y-no-residentes.csv
+--   Origen: https://datos.yvera.gob.ar (Ministerio de Turismo y Deporte)
+--   Formato: CSV UTF-8 con BOM, separador coma
+--   Columnas: indice_tiempo, origen_visitantes, visitas, observaciones
+--   Nota: indice_tiempo viene como YYYY-M-DD (ej. 2008-1-01). Se convierte
 --         a DATE usando DATEFROMPARTS para garantizar el primer dia del mes.
---               SP sp_ImportarVisitasNacionales hace UPSERT en parques.EstadisticaVisitas
+--   Estrategia: BULK INSERT en tabla temporal #VisitasNacionales ->
+--               UPSERT en parques.EstadisticaVisitas
+-- Prerequisito: Ejecutar 01_tablas_staging.sql
+-- =============================================
 
+USE ParquesNacionales;
 GO
 
--- SP: sp_ImportarVisitasNacionales
--- Carga el CSV de visitas nacionales en la tabla de staging y
--- luego ejecuta el upsert hacia la tabla final.
--- Parametro: @vRutaArchivo = ruta completa al CSV en el servidor
 CREATE OR ALTER PROCEDURE parques.sp_ImportarVisitasNacionales
     @vRutaArchivo NVARCHAR(500)
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @vSql       NVARCHAR(MAX);
-    DECLARE @vFilas     INT;
-    DECLARE @vInsertadas INT = 0;
+    DECLARE @vSql          NVARCHAR(MAX);
+    DECLARE @vFilas        INT;
+    DECLARE @vInsertadas   INT = 0;
     DECLARE @vActualizadas INT = 0;
 
     -- --------------------------------------------------------
-    -- Paso 1: Limpiar staging antes de la carga
+    -- Paso 1: Tabla temporal de staging (se destruye al finalizar)
     -- --------------------------------------------------------
-    TRUNCATE TABLE staging.VisitasNacionales;
+    CREATE TABLE #VisitasNacionales (
+        indiceTiempo      VARCHAR(20)   NULL,
+        origenVisitantes  VARCHAR(50)   NULL,
+        visitas           VARCHAR(20)   NULL,
+        observaciones     VARCHAR(500)  NULL
+    );
 
     -- --------------------------------------------------------
-    -- Paso 2: BULK INSERT del CSV en staging
-    -- El CSV tiene BOM UTF-8 (CODEPAGE 65001) y encabezado en fila 1.
-    -- El campo indice_tiempo viene como YYYY-M-DD (sin cero en el mes).
+    -- Paso 2: BULK INSERT del CSV en la tabla temporal
     -- --------------------------------------------------------
     SET @vSql = N'
-        BULK INSERT staging.VisitasNacionales
+        BULK INSERT #VisitasNacionales
         FROM ''' + @vRutaArchivo + N'''
         WITH (
             FIELDTERMINATOR  = '','',
@@ -284,15 +225,12 @@ BEGIN
     ';
     EXEC sp_executesql @vSql;
 
-    SELECT @vFilas = COUNT(*) FROM staging.VisitasNacionales;
-    PRINT 'Filas cargadas en staging: ' + CAST(@vFilas AS VARCHAR);
+    SELECT @vFilas = COUNT(*) FROM #VisitasNacionales;
+    PRINT 'Filas cargadas en staging temporal: ' + CAST(@vFilas AS VARCHAR);
 
     -- --------------------------------------------------------
     -- Paso 3: Transformacion y UPSERT hacia tabla final
-    -- indice_tiempo "2008-1-01" -> DATEFROMPARTS(2008, 1, 1)
-    -- Se parsea con PARSENAME reemplazando '-' por '.'
     -- --------------------------------------------------------
-    -- Tabla temporal para capturar el resultado del MERGE
     CREATE TABLE #vMergeOutput (accion NVARCHAR(10));
 
     BEGIN TRANSACTION;
@@ -303,19 +241,19 @@ BEGIN
                 DATEFROMPARTS(
                     CAST(PARSENAME(REPLACE(LTRIM(RTRIM(indiceTiempo)), '-', '.'), 3) AS INT),
                     CAST(PARSENAME(REPLACE(LTRIM(RTRIM(indiceTiempo)), '-', '.'), 2) AS INT),
-                    1  -- siempre primer dia del mes
-                )                                          AS periodo,
-                LOWER(LTRIM(RTRIM(origenVisitantes)))      AS origenVisitante,
+                    1
+                )                                              AS periodo,
+                LOWER(LTRIM(RTRIM(origenVisitantes)))          AS origenVisitante,
                 CAST(NULLIF(LTRIM(RTRIM(visitas)), '') AS INT) AS cantidadVisitas,
-                NULLIF(LTRIM(RTRIM(observaciones)), '')    AS observaciones
-            FROM staging.VisitasNacionales
-            WHERE indiceTiempo IS NOT NULL
+                NULLIF(LTRIM(RTRIM(observaciones)), '')        AS observaciones
+            FROM #VisitasNacionales
+            WHERE indiceTiempo    IS NOT NULL
               AND origenVisitantes IS NOT NULL
               AND visitas IS NOT NULL
               AND visitas != ''
         ) AS origen
-        ON  destino.periodo           = origen.periodo
-        AND destino.origenVisitante   = origen.origenVisitante
+        ON  destino.periodo         = origen.periodo
+        AND destino.origenVisitante = origen.origenVisitante
 
         WHEN MATCHED AND (
             destino.cantidadVisitas != origen.cantidadVisitas
@@ -329,8 +267,7 @@ BEGIN
             INSERT (periodo, origenVisitante, cantidadVisitas, observaciones)
             VALUES (origen.periodo, origen.origenVisitante, origen.cantidadVisitas, origen.observaciones)
 
-        OUTPUT $action
-        INTO   #vMergeOutput (accion);
+        OUTPUT $action INTO #vMergeOutput (accion);
 
         SELECT
             @vInsertadas   = SUM(CASE WHEN accion = 'INSERT' THEN 1 ELSE 0 END),
@@ -338,74 +275,120 @@ BEGIN
         FROM #vMergeOutput;
 
         DROP TABLE #vMergeOutput;
-
         COMMIT TRANSACTION;
 
         PRINT 'Importacion completada exitosamente.';
-        PRINT 'Filas procesadas desde CSV: ' + CAST(@vFilas AS VARCHAR);
-        PRINT 'Filas insertadas: '    + CAST(ISNULL(@vInsertadas, 0)   AS VARCHAR);
-        PRINT 'Filas actualizadas: '  + CAST(ISNULL(@vActualizadas, 0) AS VARCHAR);
+        PRINT 'Filas leidas del CSV:  ' + CAST(@vFilas AS VARCHAR);
+        PRINT 'Filas insertadas:      ' + CAST(ISNULL(@vInsertadas,   0) AS VARCHAR);
+        PRINT 'Filas actualizadas:    ' + CAST(ISNULL(@vActualizadas, 0) AS VARCHAR);
 
     END TRY
     BEGIN CATCH
         ROLLBACK TRANSACTION;
-        IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL
-            DROP TABLE #vMergeOutput;
+        IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL DROP TABLE #vMergeOutput;
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarVisitasNacionales', @vRutaArchivo, ISNULL(@vFilas,0), 0, 0, 1);
         THROW;
     END CATCH;
+
+    -- --------------------------------------------------------
+    -- Paso 4: Log de importacion
+    -- --------------------------------------------------------
+
+    -- --------------------------------------------------------
+    -- Paso 4: Seed de ventas.TipoVisitante
+    -- Los origenes del CSV definen los tipos de visitante del sistema.
+    -- --------------------------------------------------------
+    DECLARE @vTipoDesc VARCHAR(100);
+    DECLARE tv_seed CURSOR LOCAL FAST_FORWARD FOR
+        SELECT DISTINCT
+            CASE LOWER(LTRIM(RTRIM(origenVisitantes)))
+                WHEN 'residentes'    THEN 'Residente'
+                WHEN 'no residentes' THEN 'No Residente'
+            END
+        FROM #VisitasNacionales
+        WHERE LOWER(LTRIM(RTRIM(origenVisitantes))) IN ('residentes', 'no residentes');
+    OPEN tv_seed;
+    FETCH NEXT FROM tv_seed INTO @vTipoDesc;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM ventas.TipoVisitante WHERE descripcion = @vTipoDesc)
+        BEGIN
+            BEGIN TRY
+                EXEC ventas.TipoVisitante_Insertar @descripcion = @vTipoDesc;
+                PRINT 'TipoVisitante creado: ' + @vTipoDesc;
+            END TRY
+            BEGIN CATCH
+                PRINT 'Aviso TipoVisitante "' + @vTipoDesc + '": ' + ERROR_MESSAGE();
+            END CATCH
+        END
+        FETCH NEXT FROM tv_seed INTO @vTipoDesc;
+    END
+    CLOSE tv_seed; DEALLOCATE tv_seed;
+
+    INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+    VALUES ('parques.sp_ImportarVisitasNacionales', @vRutaArchivo, @vFilas,
+            ISNULL(@vInsertadas,0), ISNULL(@vActualizadas,0), 0);
 END
 GO
 
+-- ============================================================
 -- NOTA DE USO:
--- Ajustar la ruta al CSV segun el servidor SQL Server.
--- Ejemplo ejecucion:
---
 -- EXEC parques.sp_ImportarVisitasNacionales
 --     @vRutaArchivo = 'C:\TP_ParquesNacionales\datasets\visitas-residentes-y-no-residentes.csv';
---
--- Si SQL Server esta en el mismo equipo, usar ruta local.
--- Si es remoto, el archivo debe estar accesible desde el servidor.
+-- ============================================================
 PRINT 'SP parques.sp_ImportarVisitasNacionales creado correctamente.';
 GO
 
-GO
-
-
 -- ============================================================
--- IMPORTACION - Visitas por region (CSV)
+-- 02 - IMPORTACION: Visitas por region (CSV)
 -- ============================================================
 
---   Regiones: buenos aires, cordoba, cuyo, litoral, norte, patagonia
---         a DATE usando DATEFROMPARTS para garantizar el primer dia del mes.
---               SP sp_ImportarVisitasPorRegion hace UPSERT en parques.EstadisticaVisitasPorRegion
+-- =============================================
+-- Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Grupo: 03
+-- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
+-- Fecha: 15/06/2026
+-- Descripcion: Importacion de visitas por region desde CSV.
+--   Fuente: visitas-residentes-y-no-residentes-por-region.csv
+--   Origen: https://datos.yvera.gob.ar (Ministerio de Turismo y Deporte)
+--   Formato: CSV UTF-8 con BOM, separador coma
+--   Columnas: indice_tiempo, region_de_destino, origen_visitantes, visitas, observaciones
+--   Estrategia: BULK INSERT en tabla temporal #VisitasPorRegion ->
+--               UPSERT en parques.EstadisticaVisitasPorRegion
+-- Prerequisito: Ejecutar 01_tablas_staging.sql
+-- =============================================
 
+USE ParquesNacionales;
 GO
 
--- SP: sp_ImportarVisitasPorRegion
--- Carga el CSV de visitas por region en staging y luego
--- hace el upsert hacia la tabla final.
--- Parametro: @vRutaArchivo = ruta completa al CSV en el servidor
 CREATE OR ALTER PROCEDURE parques.sp_ImportarVisitasPorRegion
     @vRutaArchivo NVARCHAR(500)
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @vSql        NVARCHAR(MAX);
-    DECLARE @vFilas      INT;
+    DECLARE @vSql          NVARCHAR(MAX);
+    DECLARE @vFilas        INT;
     DECLARE @vInsertadas   INT = 0;
     DECLARE @vActualizadas INT = 0;
 
     -- --------------------------------------------------------
-    -- Paso 1: Limpiar staging antes de la carga
+    -- Paso 1: Tabla temporal de staging
     -- --------------------------------------------------------
-    TRUNCATE TABLE staging.VisitasPorRegion;
+    CREATE TABLE #VisitasPorRegion (
+        indiceTiempo      VARCHAR(20)   NULL,
+        regionDestino     VARCHAR(100)  NULL,
+        origenVisitantes  VARCHAR(50)   NULL,
+        visitas           VARCHAR(20)   NULL,
+        observaciones     VARCHAR(500)  NULL
+    );
 
     -- --------------------------------------------------------
-    -- Paso 2: BULK INSERT del CSV en staging
-    -- El CSV tiene BOM UTF-8 (CODEPAGE 65001) y encabezado en fila 1.
+    -- Paso 2: BULK INSERT
     -- --------------------------------------------------------
     SET @vSql = N'
-        BULK INSERT staging.VisitasPorRegion
+        BULK INSERT #VisitasPorRegion
         FROM ''' + @vRutaArchivo + N'''
         WITH (
             FIELDTERMINATOR  = '','',
@@ -417,8 +400,8 @@ BEGIN
     ';
     EXEC sp_executesql @vSql;
 
-    SELECT @vFilas = COUNT(*) FROM staging.VisitasPorRegion;
-    PRINT 'Filas cargadas en staging: ' + CAST(@vFilas AS VARCHAR);
+    SELECT @vFilas = COUNT(*) FROM #VisitasPorRegion;
+    PRINT 'Filas cargadas en staging temporal: ' + CAST(@vFilas AS VARCHAR);
 
     -- --------------------------------------------------------
     -- Paso 3: Transformacion y UPSERT hacia tabla final
@@ -439,9 +422,9 @@ BEGIN
                 LOWER(LTRIM(RTRIM(origenVisitantes)))           AS origenVisitante,
                 CAST(NULLIF(LTRIM(RTRIM(visitas)), '') AS INT)  AS cantidadVisitas,
                 NULLIF(LTRIM(RTRIM(observaciones)), '')         AS observaciones
-            FROM staging.VisitasPorRegion
-            WHERE indiceTiempo    IS NOT NULL
-              AND regionDestino   IS NOT NULL
+            FROM #VisitasPorRegion
+            WHERE indiceTiempo     IS NOT NULL
+              AND regionDestino    IS NOT NULL
               AND origenVisitantes IS NOT NULL
               AND visitas IS NOT NULL
               AND visitas != ''
@@ -471,67 +454,83 @@ BEGIN
         FROM #vMergeOutput;
 
         DROP TABLE #vMergeOutput;
-
         COMMIT TRANSACTION;
 
         PRINT 'Importacion por region completada exitosamente.';
-        PRINT 'Filas procesadas desde CSV: ' + CAST(@vFilas AS VARCHAR);
-        PRINT 'Filas insertadas: '    + CAST(ISNULL(@vInsertadas, 0)   AS VARCHAR);
-        PRINT 'Filas actualizadas: '  + CAST(ISNULL(@vActualizadas, 0) AS VARCHAR);
+        PRINT 'Filas leidas del CSV:  ' + CAST(@vFilas AS VARCHAR);
+        PRINT 'Filas insertadas:      ' + CAST(ISNULL(@vInsertadas,   0) AS VARCHAR);
+        PRINT 'Filas actualizadas:    ' + CAST(ISNULL(@vActualizadas, 0) AS VARCHAR);
 
     END TRY
     BEGIN CATCH
         ROLLBACK TRANSACTION;
-        IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL
-            DROP TABLE #vMergeOutput;
+        IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL DROP TABLE #vMergeOutput;
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarVisitasPorRegion', @vRutaArchivo, ISNULL(@vFilas,0), 0, 0, 1);
         THROW;
     END CATCH;
+
+    INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+    VALUES ('parques.sp_ImportarVisitasPorRegion', @vRutaArchivo, @vFilas,
+            ISNULL(@vInsertadas,0), ISNULL(@vActualizadas,0), 0);
 END
 GO
 
+-- ============================================================
 -- NOTA DE USO:
 -- EXEC parques.sp_ImportarVisitasPorRegion
 --     @vRutaArchivo = 'C:\TP_ParquesNacionales\datasets\visitas-residentes-y-no-residentes-por-region.csv';
+-- ============================================================
 PRINT 'SP parques.sp_ImportarVisitasPorRegion creado correctamente.';
 GO
 
-GO
-
-
 -- ============================================================
--- IMPORTACION - Distribucion anual APN (CSV)
+-- 02 - IMPORTACION: Visitas anuales (CSV)
 -- ============================================================
 
---           Administracion de Parques Nacionales (APN)
---               SP sp_ImportarVisitasAnual hace UPSERT en parques.EstadisticaVisitasAnual
+-- =============================================
+-- Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Grupo: 03
+-- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
+-- Fecha: 15/06/2026
+-- Descripcion: Importacion de distribucion anual de visitas desde CSV oficial de APN.
+--   Fuente: aprn_i_visitas_porc_2024.csv
+--   Origen: https://datos.gob.ar/dataset/ambiente-areas-protegidas-nacionales (APN)
+--   Formato: CSV UTF-8, separador punto y coma (;), campos entre comillas dobles
+--   Columnas: anio, residentes_en_porcentaje, no_residentes_en_porcentaje
+--   Estrategia: BULK INSERT en tabla temporal #VisitasPorcentajeAnual ->
+--               UPSERT en parques.EstadisticaVisitasAnual
+-- Prerequisito: Ejecutar 01_tablas_staging.sql
+-- =============================================
 
+USE ParquesNacionales;
 GO
 
--- SP: sp_ImportarVisitasAnual
--- Carga el CSV de porcentajes anuales en staging y hace UPSERT
--- en la tabla final parques.EstadisticaVisitasAnual.
--- Parametro: @vRutaArchivo = ruta completa al CSV en el servidor
 CREATE OR ALTER PROCEDURE parques.sp_ImportarVisitasAnual
     @vRutaArchivo NVARCHAR(500)
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @vSql        NVARCHAR(MAX);
-    DECLARE @vFilas      INT;
+    DECLARE @vSql          NVARCHAR(MAX);
+    DECLARE @vFilas        INT;
     DECLARE @vInsertadas   INT = 0;
     DECLARE @vActualizadas INT = 0;
 
     -- --------------------------------------------------------
-    -- Paso 1: Limpiar staging
+    -- Paso 1: Tabla temporal de staging
     -- --------------------------------------------------------
-    TRUNCATE TABLE staging.VisitasPorcentajeAnual;
+    CREATE TABLE #VisitasPorcentajeAnual (
+        anio                    VARCHAR(10)  NULL,
+        residentesPorcentaje    VARCHAR(10)  NULL,
+        noResidentesPorcentaje  VARCHAR(10)  NULL
+    );
 
     -- --------------------------------------------------------
-    -- Paso 2: BULK INSERT
-    -- Separador: ;   Campos entre comillas: si (FORMAT = 'CSV')
+    -- Paso 2: BULK INSERT (separador ;, campos entre comillas)
     -- --------------------------------------------------------
     SET @vSql = N'
-        BULK INSERT staging.VisitasPorcentajeAnual
+        BULK INSERT #VisitasPorcentajeAnual
         FROM ''' + @vRutaArchivo + N'''
         WITH (
             FORMAT           = ''CSV'',
@@ -544,8 +543,8 @@ BEGIN
     ';
     EXEC sp_executesql @vSql;
 
-    SELECT @vFilas = COUNT(*) FROM staging.VisitasPorcentajeAnual;
-    PRINT 'Filas cargadas en staging: ' + CAST(@vFilas AS VARCHAR);
+    SELECT @vFilas = COUNT(*) FROM #VisitasPorcentajeAnual;
+    PRINT 'Filas cargadas en staging temporal: ' + CAST(@vFilas AS VARCHAR);
 
     -- --------------------------------------------------------
     -- Paso 3: UPSERT hacia tabla final
@@ -560,7 +559,7 @@ BEGIN
                 CAST(LTRIM(RTRIM(anio))                   AS INT)          AS anio,
                 CAST(LTRIM(RTRIM(residentesPorcentaje))   AS DECIMAL(5,2)) AS residentesPorcentaje,
                 CAST(LTRIM(RTRIM(noResidentesPorcentaje)) AS DECIMAL(5,2)) AS noResidentesPorcentaje
-            FROM staging.VisitasPorcentajeAnual
+            FROM #VisitasPorcentajeAnual
             WHERE anio IS NOT NULL
               AND residentesPorcentaje IS NOT NULL
               AND noResidentesPorcentaje IS NOT NULL
@@ -587,472 +586,77 @@ BEGIN
         FROM #vMergeOutput;
 
         DROP TABLE #vMergeOutput;
-
         COMMIT TRANSACTION;
 
         PRINT 'Importacion de estadisticas anuales completada.';
-        PRINT 'Filas procesadas: '    + CAST(@vFilas               AS VARCHAR);
-        PRINT 'Registros insertados: ' + CAST(ISNULL(@vInsertadas,   0) AS VARCHAR);
-        PRINT 'Registros actualizados: '+ CAST(ISNULL(@vActualizadas, 0) AS VARCHAR);
+        PRINT 'Filas leidas del CSV:    ' + CAST(@vFilas AS VARCHAR);
+        PRINT 'Registros insertados:    ' + CAST(ISNULL(@vInsertadas,   0) AS VARCHAR);
+        PRINT 'Registros actualizados:  ' + CAST(ISNULL(@vActualizadas, 0) AS VARCHAR);
 
     END TRY
     BEGIN CATCH
         ROLLBACK TRANSACTION;
-        IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL
-            DROP TABLE #vMergeOutput;
+        IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL DROP TABLE #vMergeOutput;
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarVisitasAnual', @vRutaArchivo, ISNULL(@vFilas,0), 0, 0, 1);
         THROW;
     END CATCH;
+
+    INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+    VALUES ('parques.sp_ImportarVisitasAnual', @vRutaArchivo, @vFilas,
+            ISNULL(@vInsertadas,0), ISNULL(@vActualizadas,0), 0);
 END
 GO
 
+-- ============================================================
 -- NOTA DE USO:
 -- EXEC parques.sp_ImportarVisitasAnual
 --     @vRutaArchivo = 'C:\TP_ParquesNacionales\datasets\aprn_i_visitas_porc_2024.csv';
---
--- Verificacion:
---   SELECT anio, residentesPorcentaje, noResidentesPorcentaje
---   FROM parques.EstadisticaVisitasAnual
---   ORDER BY anio;
+-- ============================================================
 PRINT 'SP parques.sp_ImportarVisitasAnual creado correctamente.';
 GO
 
-GO
-
-
 -- ============================================================
--- IMPORTACION - Areas protegidas APN (CSV)
+-- 02 - IMPORTACION: Feriados nacionales (API JSON)
 -- ============================================================
 
---           Administracion de Parques Nacionales (APN)
---   Superficie: en hectareas (unidad oficial APN)
---               SP sp_ImportarAreasProtegidas hace UPSERT en:
---                 parques.TipoParque  (deriva tipo del prefijo del nombre)
---                 parques.Ubicacion   (usa centroide aproximado por region)
---                 parques.Parque      (nombre oficial + superficie en hectareas)
---
---   NOTA sobre coordenadas: el CSV no incluye GPS. Se asignan coordenadas
---   aproximadas (centroide de cada region) como punto de inicio.
---   Pueden actualizarse manualmente o mediante un dataset geografico posterior.
---
-
-GO
-
--- SP: sp_ImportarAreasProtegidas
--- Carga el CSV de areas protegidas en staging y hace UPSERT
--- en TipoParque, Ubicacion y Parque.
--- Parametro: @vRutaArchivo = ruta completa al CSV en el servidor
-CREATE OR ALTER PROCEDURE parques.sp_ImportarAreasProtegidas
-    @vRutaArchivo NVARCHAR(500)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @vSql        NVARCHAR(MAX);
-    DECLARE @vFilas      INT;
-    DECLARE @vInsertadas   INT = 0;
-    DECLARE @vActualizadas INT = 0;
-
-    -- --------------------------------------------------------
-    -- Paso 1: Limpiar staging
-    -- --------------------------------------------------------
-    TRUNCATE TABLE staging.AreasProtegidas;
-
-    -- --------------------------------------------------------
-    -- Paso 2: BULK INSERT
-    -- Separador: ;   Campos entre comillas: si (FORMAT = 'CSV')
-    -- Requiere SQL Server 2017+ para FORMAT = 'CSV'
-    -- --------------------------------------------------------
-    SET @vSql = N'
-        BULK INSERT staging.AreasProtegidas
-        FROM ''' + @vRutaArchivo + N'''
-        WITH (
-            FORMAT           = ''CSV'',
-            FIELDTERMINATOR  = '';'',
-            ROWTERMINATOR    = ''\n'',
-            FIRSTROW         = 2,
-            CODEPAGE         = ''65001'',
-            TABLOCK
-        );
-    ';
-    EXEC sp_executesql @vSql;
-
-    SELECT @vFilas = COUNT(*) FROM staging.AreasProtegidas;
-    PRINT 'Filas cargadas en staging: ' + CAST(@vFilas AS VARCHAR);
-
-    -- --------------------------------------------------------
-    -- Paso 3: Poblar parques.TipoParque
-    -- Deriva el tipo del prefijo del nombre del area protegida.
-    -- --------------------------------------------------------
-    MERGE parques.TipoParque AS destino
-    USING (
-        SELECT DISTINCT
-            CASE
-                WHEN areaProtegida LIKE 'Parque Nacional%'              THEN 'Parque Nacional'
-                WHEN areaProtegida LIKE 'Parque Interjurisdiccional%'   THEN 'Parque Interjurisdiccional'
-                WHEN areaProtegida LIKE 'Reserva Nacional%'             THEN 'Reserva Nacional'
-                WHEN areaProtegida LIKE 'Reserva Natural%'              THEN 'Reserva Natural'
-                WHEN areaProtegida LIKE 'Monumento Natural%'            THEN 'Monumento Natural'
-                ELSE 'Otra Area Protegida'
-            END AS descripcion
-        FROM staging.AreasProtegidas
-        WHERE areaProtegida IS NOT NULL
-    ) AS origen
-    ON destino.descripcion = origen.descripcion
-    WHEN NOT MATCHED THEN
-        INSERT (descripcion) VALUES (origen.descripcion);
-
-    PRINT 'TipoParque actualizado.';
-
-    -- --------------------------------------------------------
-    -- Paso 4: Poblar parques.Ubicacion
-    -- Una ubicacion por area protegida, usando coordenadas
-    -- aproximadas del centroide de cada region de la APN.
-    -- Mapa de regiones -> (latitud, longitud) centroide aprox.:
-    --   Centro            -> (-31.00, -67.50)   San Juan / Mendoza / Cordoba
-    --   Centro este       -> (-32.00, -60.50)   Entre Rios / Santa Fe
-    --   Nea               -> (-27.00, -57.00)   Corrientes / Misiones / Chaco
-    --   Noa               -> (-24.00, -65.00)   Salta / Jujuy / Tucuman
-    --   Patagonia norte   -> (-41.00, -71.00)   Neuquen / Rio Negro / Chubut norte
-    --   Patagonia austral -> (-50.00, -70.00)   Santa Cruz / Tierra del Fuego
-    --   Mar Argentino     -> (-50.00, -58.00)   Offshore Atlantico Sur
-    -- --------------------------------------------------------
-    MERGE parques.Ubicacion AS destino
-    USING (
-        SELECT
-            areaProtegida                      AS direccion,
-            LOWER(LTRIM(RTRIM(region)))        AS provincia,  -- usamos region como provincia
-            CASE LOWER(LTRIM(RTRIM(region)))
-                WHEN 'centro'             THEN CAST(-31.00 AS DECIMAL(9,6))
-                WHEN 'centro este'        THEN CAST(-32.00 AS DECIMAL(9,6))
-                WHEN 'nea'                THEN CAST(-27.00 AS DECIMAL(9,6))
-                WHEN 'noa'                THEN CAST(-24.00 AS DECIMAL(9,6))
-                WHEN 'patagonia norte'    THEN CAST(-41.00 AS DECIMAL(9,6))
-                WHEN 'patagonia austral'  THEN CAST(-50.00 AS DECIMAL(9,6))
-                WHEN 'mar argentino'      THEN CAST(-50.00 AS DECIMAL(9,6))
-                ELSE                           CAST(-35.00 AS DECIMAL(9,6))  -- centroide ARG
-            END AS latitud,
-            CASE LOWER(LTRIM(RTRIM(region)))
-                WHEN 'centro'             THEN CAST(-67.50 AS DECIMAL(9,6))
-                WHEN 'centro este'        THEN CAST(-60.50 AS DECIMAL(9,6))
-                WHEN 'nea'                THEN CAST(-57.00 AS DECIMAL(9,6))
-                WHEN 'noa'                THEN CAST(-65.00 AS DECIMAL(9,6))
-                WHEN 'patagonia norte'    THEN CAST(-71.00 AS DECIMAL(9,6))
-                WHEN 'patagonia austral'  THEN CAST(-70.00 AS DECIMAL(9,6))
-                WHEN 'mar argentino'      THEN CAST(-58.00 AS DECIMAL(9,6))
-                ELSE                           CAST(-65.00 AS DECIMAL(9,6))  -- centroide ARG
-            END AS longitud
-        FROM staging.AreasProtegidas
-        WHERE areaProtegida IS NOT NULL
-          AND region IS NOT NULL
-    ) AS origen
-    ON destino.direccion = origen.direccion
-    WHEN NOT MATCHED THEN
-        INSERT (direccion, provincia, latitud, longitud)
-        VALUES (origen.direccion, origen.provincia, origen.latitud, origen.longitud)
-    WHEN MATCHED THEN
-        UPDATE SET
-            destino.provincia = origen.provincia;
-
-    PRINT 'Ubicaciones actualizadas.';
-
-    -- --------------------------------------------------------
-    -- Paso 5: UPSERT en parques.Parque
-    -- --------------------------------------------------------
-    CREATE TABLE #vMergeOutput (accion NVARCHAR(10));
-
-    BEGIN TRANSACTION;
-    BEGIN TRY
-        MERGE parques.Parque AS destino
-        USING (
-            SELECT
-                s.areaProtegida                         AS nombre,
-                TRY_CAST(
-                    REPLACE(LTRIM(RTRIM(s.hectareas)), '.', '')
-                    AS DECIMAL(18,2)
-                )                                       AS superficie,  -- en hectareas
-                tp.idTipoParque,
-                u.idUbicacion
-            FROM staging.AreasProtegidas s
-            JOIN parques.TipoParque tp
-              ON tp.descripcion = CASE
-                    WHEN s.areaProtegida LIKE 'Parque Nacional%'            THEN 'Parque Nacional'
-                    WHEN s.areaProtegida LIKE 'Parque Interjurisdiccional%' THEN 'Parque Interjurisdiccional'
-                    WHEN s.areaProtegida LIKE 'Reserva Nacional%'           THEN 'Reserva Nacional'
-                    WHEN s.areaProtegida LIKE 'Reserva Natural%'            THEN 'Reserva Natural'
-                    WHEN s.areaProtegida LIKE 'Monumento Natural%'          THEN 'Monumento Natural'
-                    ELSE 'Otra Area Protegida'
-                 END
-            JOIN parques.Ubicacion u
-              ON u.direccion = s.areaProtegida
-            WHERE s.areaProtegida IS NOT NULL
-              AND s.hectareas IS NOT NULL
-        ) AS origen
-        ON destino.nombre = origen.nombre
-
-        WHEN MATCHED AND destino.superficie != origen.superficie THEN
-            UPDATE SET destino.superficie = origen.superficie
-
-        WHEN NOT MATCHED BY TARGET THEN
-            INSERT (nombre, superficie, idTipoParque, idUbicacion)
-            VALUES (origen.nombre, origen.superficie, origen.idTipoParque, origen.idUbicacion)
-
-        OUTPUT $action INTO #vMergeOutput (accion);
-
-        SELECT
-            @vInsertadas   = SUM(CASE WHEN accion = 'INSERT' THEN 1 ELSE 0 END),
-            @vActualizadas = SUM(CASE WHEN accion = 'UPDATE' THEN 1 ELSE 0 END)
-        FROM #vMergeOutput;
-
-        DROP TABLE #vMergeOutput;
-
-        COMMIT TRANSACTION;
-
-        PRINT 'Importacion de areas protegidas completada.';
-        PRINT 'Filas CSV procesadas: '  + CAST(@vFilas      AS VARCHAR);
-        PRINT 'Parques insertados: '    + CAST(ISNULL(@vInsertadas,   0) AS VARCHAR);
-        PRINT 'Parques actualizados: '  + CAST(ISNULL(@vActualizadas, 0) AS VARCHAR);
-
-    END TRY
-    BEGIN CATCH
-        ROLLBACK TRANSACTION;
-        IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL
-            DROP TABLE #vMergeOutput;
-        THROW;
-    END CATCH;
-END
-GO
-
--- NOTA DE USO:
--- EXEC parques.sp_ImportarAreasProtegidas
---     @vRutaArchivo = 'C:\TP_ParquesNacionales\datasets\aprn_h_ubicacion_superycatint_ha.csv';
---
--- Verificacion:
---   SELECT p.nombre, tp.descripcion AS tipo, p.superficie, u.provincia
---   FROM parques.Parque p
---   JOIN parques.TipoParque tp ON tp.idTipoParque = p.idTipoParque
---   JOIN parques.Ubicacion  u  ON u.idUbicacion   = p.idUbicacion
---   ORDER BY tp.descripcion, p.nombre;
-PRINT 'SP parques.sp_ImportarAreasProtegidas creado correctamente.';
-GO
-
-GO
-
-
--- ============================================================
--- IMPORTACION - Areas protegidas WDPA (CSV)
--- ============================================================
-
---   GIS_AREA esta en km2 (se convierte a hectareas multiplicando x100 para
---   mantener consistencia con el resto del sistema que usa hectareas).
---   Filtra: solo areas de jurisdiccion Nacional (DESIG_TYPE = 'National')
---               UPSERT en parques.TipoParque y parques.Parque.
---               Si el parque ya existe (importado desde APN), actualiza
---               la superficie con el valor GIS mas preciso del WDPA.
---               Si no existe, lo inserta con ubicacion pendiente de asignar.
---
---       solo procesa las relevantes para el sistema.
-
-GO
-
--- SP: sp_ImportarAreasWDPA
-CREATE OR ALTER PROCEDURE parques.sp_ImportarAreasWDPA
-    @vRutaArchivo NVARCHAR(500)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    DECLARE @vSql          NVARCHAR(MAX);
-    DECLARE @vTotalStaging INT;
-    DECLARE @vProcesadas   INT;
-    DECLARE @vDescartadas  INT;
-    DECLARE @vInsertadas   INT = 0;
-    DECLARE @vActualizadas INT = 0;
-
-    -- --------------------------------------------------------
-    -- Paso 1: Limpiar staging
-    -- --------------------------------------------------------
-    TRUNCATE TABLE staging.AreasWDPA;
-
-    -- --------------------------------------------------------
-    -- Paso 2: BULK INSERT (34 columnas, sep coma, BOM UTF-8)
-    -- --------------------------------------------------------
-    SET @vSql = N'
-        BULK INSERT staging.AreasWDPA
-        FROM ''' + @vRutaArchivo + N'''
-        WITH (
-            FORMAT          = ''CSV'',
-            FIELDTERMINATOR = '','',
-            ROWTERMINATOR   = ''\n'',
-            FIRSTROW        = 2,
-            CODEPAGE        = ''65001'',
-            TABLOCK
-        );
-    ';
-    EXEC sp_executesql @vSql;
-
-    SELECT @vTotalStaging = COUNT(*) FROM staging.AreasWDPA;
-    PRINT 'Filas cargadas en staging: ' + CAST(@vTotalStaging AS VARCHAR);
-
-    -- Contar las que seran descartadas (no nacionales o sin nombre)
-    SELECT @vDescartadas = COUNT(*)
-    FROM staging.AreasWDPA
-    WHERE LTRIM(RTRIM(desigType)) != 'National'
-       OR name IS NULL
-       OR LTRIM(RTRIM(name)) = '';
-
-    SELECT @vProcesadas = @vTotalStaging - @vDescartadas;
-    PRINT 'Filas a procesar (jurisdiccion Nacional): ' + CAST(@vProcesadas   AS VARCHAR);
-    PRINT 'Filas descartadas (no nacionales/sin nombre): ' + CAST(@vDescartadas AS VARCHAR);
-
-    -- --------------------------------------------------------
-    -- Paso 3: UPSERT en parques.TipoParque
-    -- Extrae el tipo del campo DESIG (nombre en espanol)
-    -- --------------------------------------------------------
-    MERGE parques.TipoParque AS destino
-    USING (
-        SELECT DISTINCT LTRIM(RTRIM(desig)) AS descripcion
-        FROM staging.AreasWDPA
-        WHERE LTRIM(RTRIM(desigType)) = 'National'
-          AND desig IS NOT NULL
-          AND LTRIM(RTRIM(desig)) != ''
-    ) AS origen
-    ON destino.descripcion = origen.descripcion
-    WHEN NOT MATCHED THEN
-        INSERT (descripcion) VALUES (origen.descripcion);
-
-    PRINT 'TipoParque actualizado con tipos WDPA.';
-
-    -- --------------------------------------------------------
-    -- Paso 4: UPSERT en parques.Parque
-    -- Filtra solo areas de jurisdiccion Nacional.
-    -- GIS_AREA viene en km2 -> convertimos a hectareas (* 100).
-    -- Si el parque ya existe por nombre, actualiza la superficie
-    -- con el valor GIS mas preciso del WDPA.
-    -- Si no existe, lo inserta; la Ubicacion queda pendiente
-    -- (idUbicacion apuntara a una ubicacion generica por pais).
-    -- --------------------------------------------------------
-
-    -- Ubicacion generica de Argentina para parques sin ubicacion propia
-    -- (se crea si no existe)
-    IF NOT EXISTS (SELECT 1 FROM parques.Ubicacion WHERE direccion = 'Argentina - Pendiente de asignacion')
-    BEGIN
-        INSERT INTO parques.Ubicacion (direccion, provincia, latitud, longitud)
-        VALUES ('Argentina - Pendiente de asignacion', 'Sin definir', -38.00, -65.00);
-    END
-
-    DECLARE @vIdUbicacionGenerica INT =
-        (SELECT idUbicacion FROM parques.Ubicacion
-         WHERE direccion = 'Argentina - Pendiente de asignacion');
-
-    CREATE TABLE #vMergeOutput (accion NVARCHAR(10));
-
-    BEGIN TRANSACTION;
-    BEGIN TRY
-        MERGE parques.Parque AS destino
-        USING (
-            -- Deduplicar por nombre: el WDPA puede tener Polygon + Point del mismo area.
-            -- Se toma el registro con mayor superficie (MAX gisArea).
-            SELECT
-                LTRIM(RTRIM(s.name))  AS nombre,
-                MAX(TRY_CAST(
-                    REPLACE(LTRIM(RTRIM(s.gisArea)), ',', '.')
-                    AS DECIMAL(18,2)
-                )) * 100              AS superficieHa,
-                MAX(tp.idTipoParque)  AS idTipoParque,
-                @vIdUbicacionGenerica AS idUbicacion
-            FROM staging.AreasWDPA s
-            JOIN parques.TipoParque tp
-              ON tp.descripcion = LTRIM(RTRIM(s.desig))
-            WHERE LTRIM(RTRIM(s.desigType)) = 'National'
-              AND s.name IS NOT NULL
-              AND LTRIM(RTRIM(s.name)) != ''
-              AND TRY_CAST(
-                    REPLACE(LTRIM(RTRIM(s.gisArea)), ',', '.')
-                    AS DECIMAL(18,2)
-                  ) IS NOT NULL
-            GROUP BY LTRIM(RTRIM(s.name))
-        ) AS origen
-        ON destino.nombre = origen.nombre
-
-        -- Si ya existe, actualizar superficie con el dato GIS mas preciso
-        WHEN MATCHED AND destino.superficie != origen.superficieHa THEN
-            UPDATE SET destino.superficie = origen.superficieHa
-
-        -- Si no existe, insertar con ubicacion generica
-        WHEN NOT MATCHED BY TARGET THEN
-            INSERT (nombre, superficie, idTipoParque, idUbicacion)
-            VALUES (origen.nombre, origen.superficieHa,
-                    origen.idTipoParque, origen.idUbicacion)
-
-        OUTPUT $action INTO #vMergeOutput (accion);
-
-        SELECT
-            @vInsertadas   = SUM(CASE WHEN accion = 'INSERT' THEN 1 ELSE 0 END),
-            @vActualizadas = SUM(CASE WHEN accion = 'UPDATE' THEN 1 ELSE 0 END)
-        FROM #vMergeOutput;
-
-        DROP TABLE #vMergeOutput;
-        COMMIT TRANSACTION;
-
-        PRINT '----------------------------------------------';
-        PRINT 'Importacion WDPA completada exitosamente.';
-        PRINT 'Total filas en CSV:          ' + CAST(@vTotalStaging  AS VARCHAR);
-        PRINT 'Procesadas (nacionales):     ' + CAST(@vProcesadas    AS VARCHAR);
-        PRINT 'Descartadas (no nacionales): ' + CAST(@vDescartadas   AS VARCHAR);
-        PRINT 'Parques insertados:          ' + CAST(ISNULL(@vInsertadas,   0) AS VARCHAR);
-        PRINT 'Parques actualizados:        ' + CAST(ISNULL(@vActualizadas, 0) AS VARCHAR);
-        PRINT '----------------------------------------------';
-
-    END TRY
-    BEGIN CATCH
-        ROLLBACK TRANSACTION;
-        IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL
-            DROP TABLE #vMergeOutput;
-        THROW;
-    END CATCH;
-END
-GO
-
--- NOTA DE USO:
--- EXEC parques.sp_ImportarAreasWDPA
---     @vRutaArchivo = 'C:\TP_ParquesNacionales\datasets\WDPA_WDOECM_Jun2026_Public_ARG_csv.csv';
---
--- Verificacion post-importacion:
---   SELECT p.nombre, tp.descripcion AS tipo, p.superficie, u.provincia
---   FROM parques.Parque p
---   JOIN parques.TipoParque tp ON tp.idTipoParque = p.idTipoParque
---   JOIN parques.Ubicacion  u  ON u.idUbicacion   = p.idUbicacion
---   ORDER BY tp.descripcion, p.nombre;
-PRINT 'SP parques.sp_ImportarAreasWDPA creado correctamente.';
-GO
-
-GO
-
-
--- ============================================================
--- IMPORTACION - Feriados nacionales (API REST)
--- ============================================================
-
+-- =============================================
+-- Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Grupo: 03
+-- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
+-- Fecha: 15/06/2026
+-- Descripcion: Importacion de feriados nacionales desde API REST (formato JSON).
+--   Fuente: https://argentinadatos.com/v1/feriados/{anio}
+--   Formato: JSON - segundo formato de datos del modulo de importacion
 --   Respuesta JSON (array): [{"fecha":"YYYY-MM-DD","tipo":"...","nombre":"..."}]
 --   Tipos conocidos: inamovible, trasladable, puente, nolaborable
---               parseo manual del JSON -> UPSERT en parques.Feriado
+--   Estrategia: sp_OACreate (OLE Automation) para HTTP GET ->
+--               OPENJSON -> tabla temporal #Feriados -> UPSERT en parques.Feriado
 --
+--   REQUISITO PREVIO en SQL Server:
 --     EXEC sp_configure 'Ole Automation Procedures', 1;
 --     RECONFIGURE;
 --   (requiere permisos de sysadmin)
 --
+-- Prerequisito: Ejecutar 01_tablas_staging.sql
+-- =============================================
 
+USE ParquesNacionales;
 GO
 
+-- ============================================================
 -- SP: sp_ImportarFeriados
 -- Llama a la API de ArgentinaDatos para un año dado,
 -- parsea el JSON recibido y hace UPSERT en parques.Feriado.
 -- Parametro: @vAnio = año a importar (ej. 2025)
+-- ============================================================
 CREATE OR ALTER PROCEDURE parques.sp_ImportarFeriados
     @vAnio INT
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Validacion del parametro
     IF @vAnio < 2000 OR @vAnio > 2100
     BEGIN
         RAISERROR('- El anio indicado no es valido. Debe estar entre 2000 y 2100.', 16, 1);
@@ -1063,7 +667,7 @@ BEGIN
     DECLARE @vObjHttp      INT;
     DECLARE @vHrResult     INT;
     DECLARE @vRespuesta    NVARCHAR(MAX);
-    DECLARE @vChunk        NVARCHAR(MAX);
+    DECLARE @vFilas        INT = 0;
     DECLARE @vInsertadas   INT = 0;
     DECLARE @vActualizadas INT = 0;
 
@@ -1076,6 +680,8 @@ BEGIN
     EXEC @vHrResult = sp_OACreate 'MSXML2.ServerXMLHTTP', @vObjHttp OUT;
     IF @vHrResult <> 0
     BEGIN
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarFeriados', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al crear objeto HTTP (sp_OACreate). Verificar que Ole Automation este habilitado.', 16, 1);
         RETURN;
     END
@@ -1084,6 +690,8 @@ BEGIN
     IF @vHrResult <> 0
     BEGIN
         EXEC sp_OADestroy @vObjHttp;
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarFeriados', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al abrir conexion HTTP.', 16, 1);
         RETURN;
     END
@@ -1093,16 +701,19 @@ BEGIN
     IF @vHrResult <> 0
     BEGIN
         EXEC sp_OADestroy @vObjHttp;
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarFeriados', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al enviar peticion HTTP.', 16, 1);
         RETURN;
     END
 
-    -- Leer la respuesta
     EXEC @vHrResult = sp_OAGetProperty @vObjHttp, 'responseText', @vRespuesta OUT;
     EXEC sp_OADestroy @vObjHttp;
 
     IF @vRespuesta IS NULL OR LEN(@vRespuesta) < 5
     BEGIN
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarFeriados', @vUrl, 0, 0, 0, 1);
         RAISERROR('- La API no devolvio datos. Verificar conectividad o el anio consultado.', 16, 1);
         RETURN;
     END
@@ -1110,21 +721,23 @@ BEGIN
     PRINT 'Respuesta recibida (' + CAST(LEN(@vRespuesta) AS VARCHAR) + ' caracteres).';
 
     -- --------------------------------------------------------
-    -- Paso 2: Cargar el JSON en staging
-    -- SQL Server 2016+ soporta OPENJSON nativo
+    -- Paso 2: Parsear JSON en tabla temporal
     -- --------------------------------------------------------
-    TRUNCATE TABLE staging.Feriados;
+    CREATE TABLE #Feriados (
+        fecha  VARCHAR(20)   NULL,
+        tipo   VARCHAR(50)   NULL,
+        nombre VARCHAR(200)  NULL
+    );
 
-    INSERT INTO staging.Feriados (fecha, tipo, nombre)
+    INSERT INTO #Feriados (fecha, tipo, nombre)
     SELECT
         JSON_VALUE(value, '$.fecha'),
         JSON_VALUE(value, '$.tipo'),
         JSON_VALUE(value, '$.nombre')
     FROM OPENJSON(@vRespuesta);
 
-    DECLARE @vFilas INT;
-    SELECT @vFilas = COUNT(*) FROM staging.Feriados;
-    PRINT 'Feriados cargados en staging: ' + CAST(@vFilas AS VARCHAR);
+    SELECT @vFilas = COUNT(*) FROM #Feriados;
+    PRINT 'Feriados cargados en staging temporal: ' + CAST(@vFilas AS VARCHAR);
 
     -- --------------------------------------------------------
     -- Paso 3: UPSERT hacia tabla final
@@ -1136,11 +749,11 @@ BEGIN
         MERGE parques.Feriado AS destino
         USING (
             SELECT
-                CAST(fecha AS DATE)       AS fecha,
-                LTRIM(RTRIM(tipo))        AS tipo,
-                LTRIM(RTRIM(nombre))      AS nombre
-            FROM staging.Feriados
-            WHERE fecha IS NOT NULL
+                CAST(fecha AS DATE)   AS fecha,
+                LTRIM(RTRIM(tipo))    AS tipo,
+                LTRIM(RTRIM(nombre))  AS nombre
+            FROM #Feriados
+            WHERE fecha  IS NOT NULL
               AND nombre IS NOT NULL
         ) AS origen
         ON destino.fecha = origen.fecha
@@ -1165,23 +778,28 @@ BEGIN
         FROM #vMergeOutput;
 
         DROP TABLE #vMergeOutput;
-
         COMMIT TRANSACTION;
 
         PRINT 'Importacion de feriados ' + CAST(@vAnio AS VARCHAR) + ' completada.';
-        PRINT 'Feriados insertados: '    + CAST(ISNULL(@vInsertadas, 0)   AS VARCHAR);
-        PRINT 'Feriados actualizados: '  + CAST(ISNULL(@vActualizadas, 0) AS VARCHAR);
+        PRINT 'Feriados insertados:    ' + CAST(ISNULL(@vInsertadas,   0) AS VARCHAR);
+        PRINT 'Feriados actualizados:  ' + CAST(ISNULL(@vActualizadas, 0) AS VARCHAR);
 
     END TRY
     BEGIN CATCH
         ROLLBACK TRANSACTION;
-        IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL
-            DROP TABLE #vMergeOutput;
+        IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL DROP TABLE #vMergeOutput;
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarFeriados', @vUrl, ISNULL(@vFilas,0), 0, 0, 1);
         THROW;
     END CATCH;
+
+    INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+    VALUES ('parques.sp_ImportarFeriados', @vUrl, @vFilas,
+            ISNULL(@vInsertadas,0), ISNULL(@vActualizadas,0), 0);
 END
 GO
 
+-- ============================================================
 -- NOTA DE USO:
 -- Habilitar OLE Automation en SQL Server (una sola vez, requiere sysadmin):
 --   EXEC sp_configure 'Ole Automation Procedures', 1;
@@ -1193,16 +811,22 @@ GO
 --
 -- Verificar resultado:
 --   SELECT * FROM parques.Feriado ORDER BY fecha;
+-- ============================================================
 PRINT 'SP parques.sp_ImportarFeriados creado correctamente.';
 GO
 
-GO
-
-
 -- ============================================================
--- IMPORTACION - Tipo de cambio USD/ARS (API REST)
+-- 02 - IMPORTACION: Tipo de cambio USD/ARS (API JSON)
 -- ============================================================
 
+-- =============================================
+-- Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Grupo: 03
+-- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
+-- Fecha: 15/06/2026
+-- Descripcion: Importacion del tipo de cambio USD/ARS desde API REST (formato JSON).
+--   Fuente: https://dolarapi.com (API publica argentina, sin autenticacion)
 --   Endpoints disponibles:
 --     /v1/dolares/oficial   -> dolar oficial Banco Nacion
 --     /v1/dolares/blue      -> dolar blue (mercado informal)
@@ -1210,26 +834,33 @@ GO
 --   Formato respuesta JSON: {"moneda":"USD","casa":"oficial","nombre":"Oficial",
 --                             "compra":1100.50,"venta":1120.50,
 --                             "fechaActualizacion":"2026-06-15T12:00:00.000Z"}
+--   Uso en el sistema: calcular el valor de entradas en dolares (Entrega 7,
 --   Reporte 2 - Ingresos en moneda extranjera).
+--   Estrategia: sp_OACreate (HTTP GET) -> OPENJSON -> UPSERT en parques.TipoCambio
 --
+--   REQUISITO PREVIO en SQL Server:
 --     EXEC sp_configure 'Ole Automation Procedures', 1;
 --     RECONFIGURE;
 --
+-- Prerequisito: Ejecutar 01_tablas_staging.sql
+-- =============================================
 
+USE ParquesNacionales;
 GO
 
+-- ============================================================
 -- SP: sp_ImportarTipoCambio
 -- Consulta la API dolarapi.com para el tipo indicado y guarda
 -- el valor en parques.TipoCambio con logica de Upsert.
 -- Parametro: @vTipo = 'oficial' | 'blue' | 'tarjeta'
 --            (default: 'oficial')
+-- ============================================================
 CREATE OR ALTER PROCEDURE parques.sp_ImportarTipoCambio
     @vTipo VARCHAR(20) = 'oficial'
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Validacion del parametro
     IF @vTipo NOT IN ('oficial', 'blue', 'tarjeta', 'mayorista', 'bolsa', 'cripto')
     BEGIN
         RAISERROR('- Tipo de cambio invalido. Valores validos: oficial, blue, tarjeta, mayorista, bolsa, cripto.', 16, 1);
@@ -1253,6 +884,8 @@ BEGIN
     EXEC @vHrResult = sp_OACreate 'MSXML2.ServerXMLHTTP', @vObjHttp OUT;
     IF @vHrResult <> 0
     BEGIN
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al crear objeto HTTP. Verificar que Ole Automation este habilitado.', 16, 1);
         RETURN;
     END
@@ -1261,6 +894,8 @@ BEGIN
     IF @vHrResult <> 0
     BEGIN
         EXEC sp_OADestroy @vObjHttp;
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al abrir conexion HTTP con dolarapi.com.', 16, 1);
         RETURN;
     END
@@ -1270,6 +905,8 @@ BEGIN
     IF @vHrResult <> 0
     BEGIN
         EXEC sp_OADestroy @vObjHttp;
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al enviar peticion HTTP.', 16, 1);
         RETURN;
     END
@@ -1279,6 +916,8 @@ BEGIN
 
     IF @vRespuesta IS NULL OR LEN(@vRespuesta) < 10
     BEGIN
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- La API no devolvio datos. Verificar conectividad a dolarapi.com.', 16, 1);
         RETURN;
     END
@@ -1286,9 +925,7 @@ BEGIN
     PRINT 'Respuesta recibida: ' + @vRespuesta;
 
     -- --------------------------------------------------------
-    -- Paso 2: Parsear JSON con OPENJSON (SQL Server 2016+)
-    -- Respuesta: {"moneda":"USD","casa":"oficial","nombre":"Oficial",
-    --             "compra":1100.50,"venta":1120.50,"fechaActualizacion":"..."}
+    -- Paso 2: Parsear JSON
     -- --------------------------------------------------------
     SELECT
         @vCompra = TRY_CAST(JSON_VALUE(@vRespuesta, '$.compra') AS DECIMAL(10,2)),
@@ -1296,20 +933,29 @@ BEGIN
 
     IF @vCompra IS NULL OR @vVenta IS NULL
     BEGIN
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- No se pudieron parsear los valores de compra/venta del JSON.', 16, 1);
         RETURN;
     END
 
     IF @vCompra <= 0 OR @vVenta < @vCompra
     BEGIN
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Valores de tipo de cambio invalidos recibidos de la API.', 16, 1);
         RETURN;
     END
 
     -- --------------------------------------------------------
     -- Paso 3: UPSERT en parques.TipoCambio
-    -- Si ya existe el tipo para hoy, actualiza; sino inserta.
     -- --------------------------------------------------------
+    DECLARE @vExistia BIT;
+
+    SET @vExistia = CASE WHEN EXISTS (
+        SELECT 1 FROM parques.TipoCambio WHERE fecha = @vFecha AND tipo = @vTipo
+    ) THEN 1 ELSE 0 END;
+
     BEGIN TRANSACTION;
     BEGIN TRY
         MERGE parques.TipoCambio AS destino
@@ -1327,7 +973,7 @@ BEGIN
 
         WHEN NOT MATCHED THEN
             INSERT (fecha, tipo, compra, venta)
-            VALUES (origen.fecha, origen.tipo, origen.compra, origen.venta);
+            VALUES (origen.fecha, origen.tipo, origen.compra, origen.venta)
 
         COMMIT TRANSACTION;
 
@@ -1342,14 +988,48 @@ BEGIN
     END TRY
     BEGIN CATCH
         ROLLBACK TRANSACTION;
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 1, 0, 0, 1);
         THROW;
     END CATCH;
+
+
+    -- --------------------------------------------------------
+    -- Actualizar PrecioEntrada para No Residente con el nuevo tipo de cambio
+    -- Solo aplica al tipo 'oficial' ya que es el que usa el sistema de ventas.
+    -- --------------------------------------------------------
+    IF @vTipo = 'oficial'
+    BEGIN
+        DECLARE @vIdNoResidente INT;
+        SELECT @vIdNoResidente = idTipoVisitante
+        FROM ventas.TipoVisitante
+        WHERE descripcion = 'No Residente';
+
+        IF @vIdNoResidente IS NOT NULL
+        BEGIN
+            UPDATE ventas.PrecioEntrada
+            SET valor = CAST(20.00 * @vVenta AS DECIMAL(18,2))
+            WHERE idTipoVisitante = @vIdNoResidente
+              AND (fechaHasta IS NULL OR fechaHasta >= @vFecha);
+
+            PRINT 'PrecioEntrada No Residente actualizado: $ '
+                + CAST(CAST(20.00 * @vVenta AS DECIMAL(18,2)) AS VARCHAR)
+                + ' ARS (USD 20 x ' + CAST(@vVenta AS VARCHAR) + ')';
+        END
+    END
+
+    INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+    VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 1,
+            CASE WHEN @vExistia = 0 THEN 1 ELSE 0 END,
+            CASE WHEN @vExistia = 1 THEN 1 ELSE 0 END, 0);
 END
 GO
 
+-- ============================================================
 -- SP auxiliar: sp_ObtenerTipoCambioVigente
 -- Retorna el tipo de cambio mas reciente para un tipo dado.
 -- Uso: llamarlo desde otros SPs que necesiten convertir precios.
+-- ============================================================
 CREATE OR ALTER PROCEDURE parques.sp_ObtenerTipoCambioVigente
     @vTipo   VARCHAR(20) = 'oficial',
     @vVenta  DECIMAL(10,2) OUTPUT,
@@ -1373,6 +1053,7 @@ BEGIN
 END
 GO
 
+-- ============================================================
 -- NOTA DE USO:
 -- Habilitar OLE Automation (una sola vez, requiere sysadmin):
 --   EXEC sp_configure 'Ole Automation Procedures', 1;
@@ -1391,7 +1072,662 @@ GO
 --   EXEC parques.sp_ObtenerTipoCambioVigente
 --       @vTipo = 'oficial', @vVenta = @vVenta OUTPUT, @vCompra = @vCompra OUTPUT;
 --   SELECT @vPrecioARS / @vVenta AS precioUSD;
+-- ============================================================
 PRINT 'SPs parques.sp_ImportarTipoCambio y sp_ObtenerTipoCambioVigente creados correctamente.';
 GO
 
+-- ============================================================
+-- 02 - IMPORTACION: Areas WDPA (CSV)
+-- ============================================================
+
+-- =============================================
+-- Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Grupo: 03
+-- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
+-- Fecha: 15/06/2026
+-- Descripcion: Importacion de areas protegidas desde la base de datos mundial WDPA.
+--   Fuente: WDPA_WDOECM_Jun2026_Public_ARG_csv.csv
+--   Origen: https://www.protectedplanet.net (UNEP-WCMC / IUCN)
+--   Formato: CSV UTF-8 con BOM, separador coma, 34 columnas
+--   Columnas usadas: NAME, DESIG, DESIG_TYPE, GIS_AREA
+--   GIS_AREA en km2 -> se convierte a hectareas (* 100).
+--   Filtra: solo DESIG_TYPE = 'National'
+--   Estrategia: BULK INSERT en tabla temporal #AreasWDPA ->
+--               CURSOR -> parques.TipoParque_Insertar (si el tipo no existe) ->
+--               CURSOR -> parques.RegistrarParque (nuevo) o parques.Parque_Actualizar (existente)
+--
+-- NOTA: La tabla temporal tiene todas las columnas del CSV WDPA para que
+--       BULK INSERT las pueda cargar sin FORMAT FILE. Solo se usan las relevantes.
+-- Prerequisito: Ejecutar 01_tablas_staging.sql y scripts de tablas de parques (E5).
+-- =============================================
+
+USE ParquesNacionales;
+GO
+
+-- ============================================================
+-- SP: sp_ImportarAreasWDPA
+-- ============================================================
+CREATE OR ALTER PROCEDURE parques.sp_ImportarAreasWDPA
+    @vRutaArchivo NVARCHAR(500)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @vSql              NVARCHAR(MAX);
+    DECLARE @vTotalStaging     INT = 0;
+    DECLARE @vProcesadas       INT = 0;
+    DECLARE @vDescartadas      INT = 0;
+    DECLARE @vInsertadas       INT = 0;
+    DECLARE @vActualizadas     INT = 0;
+
+    -- Cursor variables
+    DECLARE @vNombre           VARCHAR(200);
+    DECLARE @vDesig            VARCHAR(200);
+    DECLARE @vDesigType        VARCHAR(50);
+    DECLARE @vGisArea          VARCHAR(30);
+    DECLARE @vDescripcionTipo  VARCHAR(200);
+    DECLARE @vSuperficieHa     DECIMAL(18,2);
+    DECLARE @vIdTipoParque     INT;
+    DECLARE @vIdParque         INT;
+    DECLARE @vIdUbicacion      INT;
+
+    -- --------------------------------------------------------
+    -- Paso 1: Tabla temporal de staging (34 columnas del CSV WDPA)
+    -- Orden segun el CSV estandar WDPA Public v7
+    -- --------------------------------------------------------
+    CREATE TABLE #AreasWDPA (
+        wdpaId          VARCHAR(50)   NULL,  -- 1  WDPAID
+        wdpaPid         VARCHAR(100)  NULL,  -- 2  WDPA_PID
+        paDef           VARCHAR(10)   NULL,  -- 3  PA_DEF
+        name            VARCHAR(200)  NULL,  -- 4  NAME
+        origName        VARCHAR(200)  NULL,  -- 5  ORIG_NAME
+        desig           VARCHAR(200)  NULL,  -- 6  DESIG
+        desigEng        VARCHAR(200)  NULL,  -- 7  DESIG_ENG
+        desigType       VARCHAR(50)   NULL,  -- 8  DESIG_TYPE
+        iucnCat         VARCHAR(20)   NULL,  -- 9  IUCN_CAT
+        intCrit         VARCHAR(200)  NULL,  -- 10 INT_CRIT
+        marine          VARCHAR(10)   NULL,  -- 11 MARINE
+        repMArea        VARCHAR(30)   NULL,  -- 12 REP_M_AREA
+        gisMArea        VARCHAR(30)   NULL,  -- 13 GIS_M_AREA
+        repArea         VARCHAR(30)   NULL,  -- 14 REP_AREA
+        gisArea         VARCHAR(30)   NULL,  -- 15 GIS_AREA
+        noTake          VARCHAR(50)   NULL,  -- 16 NO_TAKE
+        noTkArea        VARCHAR(30)   NULL,  -- 17 NO_TK_AREA
+        status          VARCHAR(50)   NULL,  -- 18 STATUS
+        statusYr        VARCHAR(10)   NULL,  -- 19 STATUS_YR
+        govType         VARCHAR(50)   NULL,  -- 20 GOV_TYPE
+        ownType         VARCHAR(50)   NULL,  -- 21 OWN_TYPE
+        mangAuth        VARCHAR(200)  NULL,  -- 22 MANG_AUTH
+        mangPlan        VARCHAR(200)  NULL,  -- 23 MANG_PLAN
+        verif           VARCHAR(50)   NULL,  -- 24 VERIF
+        metadataId      VARCHAR(20)   NULL,  -- 25 METADATAID
+        subLoc          VARCHAR(200)  NULL,  -- 26 SUB_LOC
+        parentIso3      VARCHAR(10)   NULL,  -- 27 PARENT_ISO3
+        iso3            VARCHAR(10)   NULL,  -- 28 ISO3
+        suppInfo        VARCHAR(MAX)  NULL,  -- 29 SUPP_INFO
+        consObj         VARCHAR(MAX)  NULL,  -- 30 CONS_OBJ
+        mangPlanRef     VARCHAR(MAX)  NULL,  -- 31 MANG_PLAN_REF
+        impId           VARCHAR(50)   NULL,  -- 32 IMP_ID
+        impDate         VARCHAR(50)   NULL,  -- 33 IMP_DATE
+        col34           VARCHAR(200)  NULL   -- 34 (additional field if present)
+    );
+
+    -- --------------------------------------------------------
+    -- Paso 2: BULK INSERT
+    -- --------------------------------------------------------
+    SET @vSql = N'
+        BULK INSERT #AreasWDPA
+        FROM ''' + @vRutaArchivo + N'''
+        WITH (
+            FORMAT          = ''CSV'',
+            FIELDTERMINATOR = '','',
+            ROWTERMINATOR   = ''\n'',
+            FIRSTROW        = 2,
+            CODEPAGE        = ''65001'',
+            TABLOCK
+        );
+    ';
+    EXEC sp_executesql @vSql;
+
+    SELECT @vTotalStaging = COUNT(*) FROM #AreasWDPA;
+    PRINT 'Filas cargadas en staging temporal: ' + CAST(@vTotalStaging AS VARCHAR);
+
+    SELECT @vDescartadas = COUNT(*)
+    FROM #AreasWDPA
+    WHERE LTRIM(RTRIM(desigType)) != 'National'
+       OR name IS NULL
+       OR LTRIM(RTRIM(name)) = '';
+
+    SET @vProcesadas = @vTotalStaging - @vDescartadas;
+    PRINT 'A procesar (jurisdiccion Nacional): ' + CAST(@vProcesadas AS VARCHAR);
+    PRINT 'Descartadas (no nacionales/sin nombre): ' + CAST(@vDescartadas AS VARCHAR);
+
+    -- --------------------------------------------------------
+    -- Paso 3: Insertar TipoParque (si no existe) via SP de E5
+    -- --------------------------------------------------------
+    DECLARE tipo_cursor CURSOR LOCAL FAST_FORWARD FOR
+        SELECT DISTINCT LTRIM(RTRIM(desig))
+        FROM #AreasWDPA
+        WHERE LTRIM(RTRIM(desigType)) = 'National'
+          AND desig IS NOT NULL
+          AND LTRIM(RTRIM(desig)) != '';
+
+    OPEN tipo_cursor;
+    FETCH NEXT FROM tipo_cursor INTO @vDescripcionTipo;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM parques.TipoParque WHERE descripcion = @vDescripcionTipo)
+        BEGIN
+            BEGIN TRY
+                EXEC parques.TipoParque_Insertar @descripcion = @vDescripcionTipo;
+            END TRY
+            BEGIN CATCH
+                PRINT 'Aviso: no se pudo insertar TipoParque "' + @vDescripcionTipo + '": ' + ERROR_MESSAGE();
+            END CATCH
+        END
+        FETCH NEXT FROM tipo_cursor INTO @vDescripcionTipo;
+    END
+    CLOSE tipo_cursor;
+    DEALLOCATE tipo_cursor;
+    PRINT 'TipoParque actualizado con tipos WDPA.';
+
+    -- --------------------------------------------------------
+    -- Paso 4: Insertar / actualizar Parques via SPs de E5
+    -- WDPA puede tener duplicados (Polygon + Point del mismo area).
+    -- El cursor usa MAX(gisArea) por nombre para tomar la mayor superficie.
+    -- Si el parque no existe: llama parques.RegistrarParque (con ubicacion generica).
+    -- Si ya existe: llama parques.Parque_Actualizar para actualizar superficie.
+    -- --------------------------------------------------------
+
+    -- Crear ubicacion generica si no existe
+    IF NOT EXISTS (SELECT 1 FROM parques.Ubicacion WHERE direccion = 'Argentina - Pendiente de asignacion')
+    BEGIN
+        INSERT INTO parques.Ubicacion (direccion, provincia, latitud, longitud)
+        VALUES ('Argentina - Pendiente de asignacion', 'Sin definir', -38.00, -65.00);
+    END
+
+    DECLARE wdpa_cursor CURSOR LOCAL FAST_FORWARD FOR
+        SELECT
+            LTRIM(RTRIM(s.name)),
+            LTRIM(RTRIM(s.desig)),
+            MAX(TRY_CAST(REPLACE(LTRIM(RTRIM(s.gisArea)), ',', '.') AS DECIMAL(18,2))) * 100
+        FROM #AreasWDPA s
+        WHERE LTRIM(RTRIM(s.desigType)) = 'National'
+          AND s.name IS NOT NULL
+          AND LTRIM(RTRIM(s.name)) != ''
+          AND TRY_CAST(REPLACE(LTRIM(RTRIM(s.gisArea)), ',', '.') AS DECIMAL(18,2)) IS NOT NULL
+        GROUP BY LTRIM(RTRIM(s.name)), LTRIM(RTRIM(s.desig));
+
+    OPEN wdpa_cursor;
+    FETCH NEXT FROM wdpa_cursor INTO @vNombre, @vDescripcionTipo, @vSuperficieHa;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SELECT @vIdTipoParque = idTipoParque
+        FROM parques.TipoParque
+        WHERE descripcion = @vDescripcionTipo;
+
+        IF @vIdTipoParque IS NOT NULL AND @vSuperficieHa IS NOT NULL AND @vSuperficieHa > 0
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM parques.Parque WHERE nombre = @vNombre)
+            BEGIN
+                BEGIN TRY
+                    EXEC parques.RegistrarParque
+                        @nombre       = @vNombre,
+                        @superficie   = @vSuperficieHa,
+                        @idTipoParque = @vIdTipoParque,
+                        @direccion    = 'Argentina - Pendiente de asignacion',
+                        @provincia    = 'Sin definir',
+                        @latitud      = -38.00,
+                        @longitud     = -65.00;
+                    SET @vInsertadas += 1;
+                END TRY
+                BEGIN CATCH
+                    PRINT 'Error al insertar parque WDPA "' + @vNombre + '": ' + ERROR_MESSAGE();
+                END CATCH
+            END
+            ELSE
+            BEGIN
+                SELECT @vIdParque    = idParque,
+                       @vIdUbicacion = idUbicacion,
+                       @vIdTipoParque = idTipoParque
+                FROM parques.Parque
+                WHERE nombre = @vNombre;
+
+                BEGIN TRY
+                    EXEC parques.Parque_Actualizar
+                        @idParque     = @vIdParque,
+                        @nombre       = @vNombre,
+                        @superficie   = @vSuperficieHa,
+                        @idTipoParque = @vIdTipoParque,
+                        @idUbicacion  = @vIdUbicacion;
+                    SET @vActualizadas += 1;
+                END TRY
+                BEGIN CATCH
+                    PRINT 'Error al actualizar parque WDPA "' + @vNombre + '": ' + ERROR_MESSAGE();
+                END CATCH
+            END
+        END
+
+        FETCH NEXT FROM wdpa_cursor INTO @vNombre, @vDescripcionTipo, @vSuperficieHa;
+    END
+    CLOSE wdpa_cursor;
+    DEALLOCATE wdpa_cursor;
+
+    PRINT '----------------------------------------------';
+    PRINT 'Importacion WDPA completada exitosamente.';
+    PRINT 'Total filas en CSV:          ' + CAST(@vTotalStaging AS VARCHAR);
+    PRINT 'Procesadas (nacionales):     ' + CAST(@vProcesadas   AS VARCHAR);
+    PRINT 'Descartadas:                 ' + CAST(@vDescartadas  AS VARCHAR);
+    PRINT 'Parques insertados:          ' + CAST(@vInsertadas   AS VARCHAR);
+    PRINT 'Parques actualizados:        ' + CAST(@vActualizadas AS VARCHAR);
+    PRINT '----------------------------------------------';
+
+
+    -- --------------------------------------------------------
+    -- Paso 5: Seed de ventas.TipoVisitante y ventas.PrecioEntrada
+    -- Asegura que los tipos de visitante existen y crea precios
+    -- iniciales para cada parque x tipo que no tenga precio vigente.
+    -- Residente:    $ 10.000 ARS
+    -- No Residente: USD 20 x tipo de cambio oficial (o $ 10.000 si no hay TC)
+    -- --------------------------------------------------------
+    IF NOT EXISTS (SELECT 1 FROM ventas.TipoVisitante WHERE descripcion = 'Residente')
+        EXEC ventas.TipoVisitante_Insertar @descripcion = 'Residente';
+    IF NOT EXISTS (SELECT 1 FROM ventas.TipoVisitante WHERE descripcion = 'No Residente')
+        EXEC ventas.TipoVisitante_Insertar @descripcion = 'No Residente';
+
+    DECLARE @vTCVenta       DECIMAL(10,2);
+    DECLARE @vFechaSeed     DATE = CAST(GETDATE() AS DATE);
+    DECLARE @vIdParqueSeed  INT;
+    DECLARE @vIdTVSeed      INT;
+    DECLARE @vDescTVSeed    VARCHAR(100);
+    DECLARE @vValorSeed     DECIMAL(18,2);
+
+    SELECT TOP 1 @vTCVenta = venta
+    FROM parques.TipoCambio
+    WHERE tipo = 'oficial'
+    ORDER BY fecha DESC;
+
+    DECLARE precio_seed CURSOR LOCAL FAST_FORWARD FOR
+        SELECT p.idParque, tv.idTipoVisitante, tv.descripcion
+        FROM parques.Parque p
+        CROSS JOIN ventas.TipoVisitante tv
+        WHERE NOT EXISTS (
+            SELECT 1 FROM ventas.PrecioEntrada pe
+            WHERE pe.idParque        = p.idParque
+              AND pe.idTipoVisitante = tv.idTipoVisitante
+              AND (pe.fechaHasta IS NULL OR pe.fechaHasta >= @vFechaSeed)
+        );
+
+    OPEN precio_seed;
+    FETCH NEXT FROM precio_seed INTO @vIdParqueSeed, @vIdTVSeed, @vDescTVSeed;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SET @vValorSeed = CASE @vDescTVSeed
+            WHEN 'Residente'    THEN 10000.00
+            WHEN 'No Residente' THEN
+                CASE WHEN @vTCVenta > 0
+                     THEN CAST(20.00 * @vTCVenta AS DECIMAL(18,2))
+                     ELSE 10000.00
+                END
+            ELSE 10000.00
+        END;
+
+        BEGIN TRY
+            EXEC ventas.PrecioEntrada_Insertar
+                @fechaActualizacion = @vFechaSeed,
+                @valor              = @vValorSeed,
+                @idParque           = @vIdParqueSeed,
+                @idTipoVisitante    = @vIdTVSeed,
+                @fechaHasta         = NULL;
+        END TRY
+        BEGIN CATCH
+            PRINT 'Aviso precio parque ' + CAST(@vIdParqueSeed AS VARCHAR)
+                + ' / ' + @vDescTVSeed + ': ' + ERROR_MESSAGE();
+        END CATCH
+
+        FETCH NEXT FROM precio_seed INTO @vIdParqueSeed, @vIdTVSeed, @vDescTVSeed;
+    END
+    CLOSE precio_seed; DEALLOCATE precio_seed;
+    PRINT 'Seed de PrecioEntrada completado.';
+
+    INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+    VALUES ('parques.sp_ImportarAreasWDPA', @vRutaArchivo, @vTotalStaging,
+            @vInsertadas, @vActualizadas, 0);
+END
+GO
+
+-- ============================================================
+-- NOTA DE USO:
+-- EXEC parques.sp_ImportarAreasWDPA
+--     @vRutaArchivo = 'C:\TP_ParquesNacionales\datasets\WDPA_WDOECM_Jun2026_Public_ARG_csv.csv';
+--
+-- Verificacion post-importacion:
+--   SELECT p.nombre, tp.descripcion AS tipo, p.superficie, u.provincia
+--   FROM parques.Parque p
+--   JOIN parques.TipoParque tp ON tp.idTipoParque = p.idTipoParque
+--   JOIN parques.Ubicacion  u  ON u.idUbicacion   = p.idUbicacion
+--   ORDER BY tp.descripcion, p.nombre;
+-- ============================================================
+PRINT 'SP parques.sp_ImportarAreasWDPA creado correctamente.';
+GO
+
+-- ============================================================
+-- 03 - DATOS INICIALES: Areas protegidas APN (CSV)
+-- ============================================================
+
+-- =============================================
+-- Universidad Nacional de La Matanza
+-- Materia: 3641 - Bases de Datos Aplicada
+-- Grupo: 03
+-- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
+-- Fecha: 15/06/2026
+-- Descripcion: Importacion de areas protegidas nacionales desde CSV oficial de APN.
+--   Fuente: aprn_h_ubicacion_superycatint_ha.csv
+--   Origen: https://datos.gob.ar/dataset/ambiente-areas-protegidas-nacionales
+--           Administracion de Parques Nacionales (APN)
+--   Formato: CSV UTF-8, separador punto y coma (;), campos entre comillas dobles
+--   Columnas: region, area_protegida, hectareas, categoria_internacional
+--   Estrategia: BULK INSERT en tabla temporal #AreasProtegidas ->
+--               CURSOR -> parques.TipoParque_Insertar (si el tipo no existe) ->
+--               CURSOR -> parques.RegistrarParque (nuevo) o parques.Parque_Actualizar (existente)
+--
+--   NOTA sobre coordenadas: el CSV no incluye GPS. Se asignan coordenadas
+--   aproximadas (centroide de cada region) como punto de inicio.
+--
+-- Prerequisito: Ejecutar 01_tablas_staging.sql y los scripts de tablas del modulo parques (E5).
+-- =============================================
+
+USE ParquesNacionales;
+GO
+
+-- ============================================================
+-- SP: sp_ImportarAreasProtegidas
+-- ============================================================
+CREATE OR ALTER PROCEDURE parques.sp_ImportarAreasProtegidas
+    @vRutaArchivo NVARCHAR(500)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @vSql              NVARCHAR(MAX);
+    DECLARE @vFilas            INT = 0;
+    DECLARE @vInsertadas       INT = 0;
+    DECLARE @vActualizadas     INT = 0;
+
+    -- Cursor variables
+    DECLARE @vRegion           VARCHAR(100);
+    DECLARE @vAreaProtegida    VARCHAR(200);
+    DECLARE @vHectareas        VARCHAR(30);
+    DECLARE @vDescripcionTipo  VARCHAR(100);
+    DECLARE @vSuperficie       DECIMAL(18,2);
+    DECLARE @vLat              DECIMAL(9,6);
+    DECLARE @vLon              DECIMAL(9,6);
+    DECLARE @vIdTipoParque     INT;
+    DECLARE @vIdParque         INT;
+    DECLARE @vIdUbicacion      INT;
+
+    -- --------------------------------------------------------
+    -- Paso 1: Tabla temporal de staging
+    -- --------------------------------------------------------
+    CREATE TABLE #AreasProtegidas (
+        region                 VARCHAR(100)  NULL,
+        areaProtegida          VARCHAR(200)  NULL,
+        hectareas              VARCHAR(30)   NULL,
+        categoriaInternacional VARCHAR(100)  NULL
+    );
+
+    -- --------------------------------------------------------
+    -- Paso 2: BULK INSERT
+    -- --------------------------------------------------------
+    SET @vSql = N'
+        BULK INSERT #AreasProtegidas
+        FROM ''' + @vRutaArchivo + N'''
+        WITH (
+            FORMAT           = ''CSV'',
+            FIELDTERMINATOR  = '';'',
+            ROWTERMINATOR    = ''\n'',
+            FIRSTROW         = 2,
+            CODEPAGE         = ''65001'',
+            TABLOCK
+        );
+    ';
+    EXEC sp_executesql @vSql;
+
+    SELECT @vFilas = COUNT(*) FROM #AreasProtegidas;
+    PRINT 'Filas cargadas en staging temporal: ' + CAST(@vFilas AS VARCHAR);
+
+    -- --------------------------------------------------------
+    -- Paso 3: Insertar TipoParque (si no existe) via SP de E5
+    -- --------------------------------------------------------
+    DECLARE tipo_cursor CURSOR LOCAL FAST_FORWARD FOR
+        SELECT DISTINCT
+            CASE
+                WHEN areaProtegida LIKE 'Parque Nacional%'              THEN 'Parque Nacional'
+                WHEN areaProtegida LIKE 'Parque Interjurisdiccional%'   THEN 'Parque Interjurisdiccional'
+                WHEN areaProtegida LIKE 'Reserva Nacional%'             THEN 'Reserva Nacional'
+                WHEN areaProtegida LIKE 'Reserva Natural%'              THEN 'Reserva Natural'
+                WHEN areaProtegida LIKE 'Monumento Natural%'            THEN 'Monumento Natural'
+                ELSE 'Otra Area Protegida'
+            END
+        FROM #AreasProtegidas
+        WHERE areaProtegida IS NOT NULL;
+
+    OPEN tipo_cursor;
+    FETCH NEXT FROM tipo_cursor INTO @vDescripcionTipo;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM parques.TipoParque WHERE descripcion = @vDescripcionTipo)
+        BEGIN
+            BEGIN TRY
+                EXEC parques.TipoParque_Insertar @descripcion = @vDescripcionTipo;
+            END TRY
+            BEGIN CATCH
+                PRINT 'Aviso: no se pudo insertar TipoParque "' + @vDescripcionTipo + '": ' + ERROR_MESSAGE();
+            END CATCH
+        END
+        FETCH NEXT FROM tipo_cursor INTO @vDescripcionTipo;
+    END
+    CLOSE tipo_cursor;
+    DEALLOCATE tipo_cursor;
+    PRINT 'TipoParque actualizado.';
+
+    -- --------------------------------------------------------
+    -- Paso 4: Insertar / actualizar Parques via SPs de E5
+    -- Usa parques.RegistrarParque (nuevo) o parques.Parque_Actualizar (existente).
+    -- Coordenadas aproximadas por region (centroide APN).
+    -- --------------------------------------------------------
+    DECLARE parque_cursor CURSOR LOCAL FAST_FORWARD FOR
+        SELECT region, areaProtegida, hectareas
+        FROM #AreasProtegidas
+        WHERE areaProtegida IS NOT NULL
+          AND hectareas IS NOT NULL
+          AND LTRIM(RTRIM(hectareas)) != '';
+
+    OPEN parque_cursor;
+    FETCH NEXT FROM parque_cursor INTO @vRegion, @vAreaProtegida, @vHectareas;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        -- Calcular superficie
+        SET @vSuperficie = TRY_CAST(
+            REPLACE(LTRIM(RTRIM(@vHectareas)), '.', '')
+            AS DECIMAL(18,2)
+        );
+
+        -- Derivar tipo del nombre
+        SET @vDescripcionTipo = CASE
+            WHEN @vAreaProtegida LIKE 'Parque Nacional%'              THEN 'Parque Nacional'
+            WHEN @vAreaProtegida LIKE 'Parque Interjurisdiccional%'   THEN 'Parque Interjurisdiccional'
+            WHEN @vAreaProtegida LIKE 'Reserva Nacional%'             THEN 'Reserva Nacional'
+            WHEN @vAreaProtegida LIKE 'Reserva Natural%'              THEN 'Reserva Natural'
+            WHEN @vAreaProtegida LIKE 'Monumento Natural%'            THEN 'Monumento Natural'
+            ELSE 'Otra Area Protegida'
+        END;
+
+        SELECT @vIdTipoParque = idTipoParque
+        FROM parques.TipoParque
+        WHERE descripcion = @vDescripcionTipo;
+
+        -- Coordenadas aproximadas por region APN
+        SET @vLat = CASE LOWER(LTRIM(RTRIM(@vRegion)))
+            WHEN 'centro'             THEN CAST(-31.00 AS DECIMAL(9,6))
+            WHEN 'centro este'        THEN CAST(-32.00 AS DECIMAL(9,6))
+            WHEN 'nea'                THEN CAST(-27.00 AS DECIMAL(9,6))
+            WHEN 'noa'                THEN CAST(-24.00 AS DECIMAL(9,6))
+            WHEN 'patagonia norte'    THEN CAST(-41.00 AS DECIMAL(9,6))
+            WHEN 'patagonia austral'  THEN CAST(-50.00 AS DECIMAL(9,6))
+            WHEN 'mar argentino'      THEN CAST(-50.00 AS DECIMAL(9,6))
+            ELSE                           CAST(-35.00 AS DECIMAL(9,6))
+        END;
+
+        SET @vLon = CASE LOWER(LTRIM(RTRIM(@vRegion)))
+            WHEN 'centro'             THEN CAST(-67.50 AS DECIMAL(9,6))
+            WHEN 'centro este'        THEN CAST(-60.50 AS DECIMAL(9,6))
+            WHEN 'nea'                THEN CAST(-57.00 AS DECIMAL(9,6))
+            WHEN 'noa'                THEN CAST(-65.00 AS DECIMAL(9,6))
+            WHEN 'patagonia norte'    THEN CAST(-71.00 AS DECIMAL(9,6))
+            WHEN 'patagonia austral'  THEN CAST(-70.00 AS DECIMAL(9,6))
+            WHEN 'mar argentino'      THEN CAST(-58.00 AS DECIMAL(9,6))
+            ELSE                           CAST(-65.00 AS DECIMAL(9,6))
+        END;
+
+        IF @vSuperficie IS NOT NULL AND @vSuperficie > 0 AND @vIdTipoParque IS NOT NULL
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM parques.Parque WHERE nombre = @vAreaProtegida)
+            BEGIN
+                -- Parque nuevo: usar SP de negocio (crea Ubicacion + Parque)
+                BEGIN TRY
+                    EXEC parques.RegistrarParque
+                        @nombre       = @vAreaProtegida,
+                        @superficie   = @vSuperficie,
+                        @idTipoParque = @vIdTipoParque,
+                        @direccion    = @vAreaProtegida,
+                        @provincia    = @vRegion,
+                        @latitud      = @vLat,
+                        @longitud     = @vLon;
+                    SET @vInsertadas += 1;
+                END TRY
+                BEGIN CATCH
+                    PRINT 'Error al insertar parque "' + @vAreaProtegida + '": ' + ERROR_MESSAGE();
+                END CATCH
+            END
+            ELSE
+            BEGIN
+                -- Parque existente: actualizar solo superficie si cambio
+                SELECT @vIdParque    = idParque,
+                       @vIdUbicacion = idUbicacion,
+                       @vIdTipoParque = idTipoParque
+                FROM parques.Parque
+                WHERE nombre = @vAreaProtegida;
+
+                BEGIN TRY
+                    EXEC parques.Parque_Actualizar
+                        @idParque     = @vIdParque,
+                        @nombre       = @vAreaProtegida,
+                        @superficie   = @vSuperficie,
+                        @idTipoParque = @vIdTipoParque,
+                        @idUbicacion  = @vIdUbicacion;
+                    SET @vActualizadas += 1;
+                END TRY
+                BEGIN CATCH
+                    PRINT 'Error al actualizar parque "' + @vAreaProtegida + '": ' + ERROR_MESSAGE();
+                END CATCH
+            END
+        END
+
+        FETCH NEXT FROM parque_cursor INTO @vRegion, @vAreaProtegida, @vHectareas;
+    END
+    CLOSE parque_cursor;
+    DEALLOCATE parque_cursor;
+
+    PRINT 'Importacion de areas protegidas completada.';
+    PRINT 'Filas CSV procesadas: '  + CAST(@vFilas         AS VARCHAR);
+    PRINT 'Parques insertados:   '  + CAST(@vInsertadas    AS VARCHAR);
+    PRINT 'Parques actualizados: '  + CAST(@vActualizadas  AS VARCHAR);
+
+
+    -- --------------------------------------------------------
+    -- Paso 5: Seed de ventas.TipoVisitante y ventas.PrecioEntrada
+    -- Asegura que los tipos de visitante existen y crea precios
+    -- iniciales para cada parque x tipo que no tenga precio vigente.
+    -- Residente:    $ 10.000 ARS
+    -- No Residente: USD 20 x tipo de cambio oficial (o $ 10.000 si no hay TC)
+    -- --------------------------------------------------------
+    IF NOT EXISTS (SELECT 1 FROM ventas.TipoVisitante WHERE descripcion = 'Residente')
+        EXEC ventas.TipoVisitante_Insertar @descripcion = 'Residente';
+    IF NOT EXISTS (SELECT 1 FROM ventas.TipoVisitante WHERE descripcion = 'No Residente')
+        EXEC ventas.TipoVisitante_Insertar @descripcion = 'No Residente';
+
+    DECLARE @vTCVenta       DECIMAL(10,2);
+    DECLARE @vFechaSeed     DATE = CAST(GETDATE() AS DATE);
+    DECLARE @vIdParqueSeed  INT;
+    DECLARE @vIdTVSeed      INT;
+    DECLARE @vDescTVSeed    VARCHAR(100);
+    DECLARE @vValorSeed     DECIMAL(18,2);
+
+    SELECT TOP 1 @vTCVenta = venta
+    FROM parques.TipoCambio
+    WHERE tipo = 'oficial'
+    ORDER BY fecha DESC;
+
+    DECLARE precio_seed CURSOR LOCAL FAST_FORWARD FOR
+        SELECT p.idParque, tv.idTipoVisitante, tv.descripcion
+        FROM parques.Parque p
+        CROSS JOIN ventas.TipoVisitante tv
+        WHERE NOT EXISTS (
+            SELECT 1 FROM ventas.PrecioEntrada pe
+            WHERE pe.idParque        = p.idParque
+              AND pe.idTipoVisitante = tv.idTipoVisitante
+              AND (pe.fechaHasta IS NULL OR pe.fechaHasta >= @vFechaSeed)
+        );
+
+    OPEN precio_seed;
+    FETCH NEXT FROM precio_seed INTO @vIdParqueSeed, @vIdTVSeed, @vDescTVSeed;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SET @vValorSeed = CASE @vDescTVSeed
+            WHEN 'Residente'    THEN 10000.00
+            WHEN 'No Residente' THEN
+                CASE WHEN @vTCVenta > 0
+                     THEN CAST(20.00 * @vTCVenta AS DECIMAL(18,2))
+                     ELSE 10000.00
+                END
+            ELSE 10000.00
+        END;
+
+        BEGIN TRY
+            EXEC ventas.PrecioEntrada_Insertar
+                @fechaActualizacion = @vFechaSeed,
+                @valor              = @vValorSeed,
+                @idParque           = @vIdParqueSeed,
+                @idTipoVisitante    = @vIdTVSeed,
+                @fechaHasta         = NULL;
+        END TRY
+        BEGIN CATCH
+            PRINT 'Aviso precio parque ' + CAST(@vIdParqueSeed AS VARCHAR)
+                + ' / ' + @vDescTVSeed + ': ' + ERROR_MESSAGE();
+        END CATCH
+
+        FETCH NEXT FROM precio_seed INTO @vIdParqueSeed, @vIdTVSeed, @vDescTVSeed;
+    END
+    CLOSE precio_seed; DEALLOCATE precio_seed;
+    PRINT 'Seed de PrecioEntrada completado.';
+
+    INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+    VALUES ('parques.sp_ImportarAreasProtegidas', @vRutaArchivo, @vFilas,
+            @vInsertadas, @vActualizadas, 0);
+END
+GO
+
+-- ============================================================
+-- NOTA DE USO:
+-- EXEC parques.sp_ImportarAreasProtegidas
+--     @vRutaArchivo = 'C:\TP_ParquesNacionales\datasets\aprn_h_ubicacion_superycatint_ha.csv';
+--
+-- Verificacion:
+--   SELECT p.nombre, tp.descripcion AS tipo, p.superficie, u.provincia
+--   FROM parques.Parque p
+--   JOIN parques.TipoParque tp ON tp.idTipoParque = p.idTipoParque
+--   JOIN parques.Ubicacion  u  ON u.idUbicacion   = p.idUbicacion
+--   ORDER BY tp.descripcion, p.nombre;
+-- ============================================================
+PRINT 'SP parques.sp_ImportarAreasProtegidas creado correctamente.';
 GO

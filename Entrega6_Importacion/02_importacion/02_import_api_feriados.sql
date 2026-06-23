@@ -10,7 +10,7 @@
 --   Respuesta JSON (array): [{"fecha":"YYYY-MM-DD","tipo":"...","nombre":"..."}]
 --   Tipos conocidos: inamovible, trasladable, puente, nolaborable
 --   Estrategia: sp_OACreate (OLE Automation) para HTTP GET ->
---               parseo manual del JSON -> UPSERT en parques.Feriado
+--               OPENJSON -> tabla temporal #Feriados -> UPSERT en parques.Feriado
 --
 --   REQUISITO PREVIO en SQL Server:
 --     EXEC sp_configure 'Ole Automation Procedures', 1;
@@ -35,7 +35,6 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Validacion del parametro
     IF @vAnio < 2000 OR @vAnio > 2100
     BEGIN
         RAISERROR('- El anio indicado no es valido. Debe estar entre 2000 y 2100.', 16, 1);
@@ -46,7 +45,7 @@ BEGIN
     DECLARE @vObjHttp      INT;
     DECLARE @vHrResult     INT;
     DECLARE @vRespuesta    NVARCHAR(MAX);
-    DECLARE @vChunk        NVARCHAR(MAX);
+    DECLARE @vFilas        INT = 0;
     DECLARE @vInsertadas   INT = 0;
     DECLARE @vActualizadas INT = 0;
 
@@ -59,6 +58,8 @@ BEGIN
     EXEC @vHrResult = sp_OACreate 'MSXML2.ServerXMLHTTP', @vObjHttp OUT;
     IF @vHrResult <> 0
     BEGIN
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarFeriados', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al crear objeto HTTP (sp_OACreate). Verificar que Ole Automation este habilitado.', 16, 1);
         RETURN;
     END
@@ -67,6 +68,8 @@ BEGIN
     IF @vHrResult <> 0
     BEGIN
         EXEC sp_OADestroy @vObjHttp;
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarFeriados', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al abrir conexion HTTP.', 16, 1);
         RETURN;
     END
@@ -76,16 +79,19 @@ BEGIN
     IF @vHrResult <> 0
     BEGIN
         EXEC sp_OADestroy @vObjHttp;
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarFeriados', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al enviar peticion HTTP.', 16, 1);
         RETURN;
     END
 
-    -- Leer la respuesta
     EXEC @vHrResult = sp_OAGetProperty @vObjHttp, 'responseText', @vRespuesta OUT;
     EXEC sp_OADestroy @vObjHttp;
 
     IF @vRespuesta IS NULL OR LEN(@vRespuesta) < 5
     BEGIN
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarFeriados', @vUrl, 0, 0, 0, 1);
         RAISERROR('- La API no devolvio datos. Verificar conectividad o el anio consultado.', 16, 1);
         RETURN;
     END
@@ -93,21 +99,23 @@ BEGIN
     PRINT 'Respuesta recibida (' + CAST(LEN(@vRespuesta) AS VARCHAR) + ' caracteres).';
 
     -- --------------------------------------------------------
-    -- Paso 2: Cargar el JSON en staging
-    -- SQL Server 2016+ soporta OPENJSON nativo
+    -- Paso 2: Parsear JSON en tabla temporal
     -- --------------------------------------------------------
-    TRUNCATE TABLE staging.Feriados;
+    CREATE TABLE #Feriados (
+        fecha  VARCHAR(20)   NULL,
+        tipo   VARCHAR(50)   NULL,
+        nombre VARCHAR(200)  NULL
+    );
 
-    INSERT INTO staging.Feriados (fecha, tipo, nombre)
+    INSERT INTO #Feriados (fecha, tipo, nombre)
     SELECT
         JSON_VALUE(value, '$.fecha'),
         JSON_VALUE(value, '$.tipo'),
         JSON_VALUE(value, '$.nombre')
     FROM OPENJSON(@vRespuesta);
 
-    DECLARE @vFilas INT;
-    SELECT @vFilas = COUNT(*) FROM staging.Feriados;
-    PRINT 'Feriados cargados en staging: ' + CAST(@vFilas AS VARCHAR);
+    SELECT @vFilas = COUNT(*) FROM #Feriados;
+    PRINT 'Feriados cargados en staging temporal: ' + CAST(@vFilas AS VARCHAR);
 
     -- --------------------------------------------------------
     -- Paso 3: UPSERT hacia tabla final
@@ -119,11 +127,11 @@ BEGIN
         MERGE parques.Feriado AS destino
         USING (
             SELECT
-                CAST(fecha AS DATE)       AS fecha,
-                LTRIM(RTRIM(tipo))        AS tipo,
-                LTRIM(RTRIM(nombre))      AS nombre
-            FROM staging.Feriados
-            WHERE fecha IS NOT NULL
+                CAST(fecha AS DATE)   AS fecha,
+                LTRIM(RTRIM(tipo))    AS tipo,
+                LTRIM(RTRIM(nombre))  AS nombre
+            FROM #Feriados
+            WHERE fecha  IS NOT NULL
               AND nombre IS NOT NULL
         ) AS origen
         ON destino.fecha = origen.fecha
@@ -148,20 +156,24 @@ BEGIN
         FROM #vMergeOutput;
 
         DROP TABLE #vMergeOutput;
-
         COMMIT TRANSACTION;
 
         PRINT 'Importacion de feriados ' + CAST(@vAnio AS VARCHAR) + ' completada.';
-        PRINT 'Feriados insertados: '    + CAST(ISNULL(@vInsertadas, 0)   AS VARCHAR);
-        PRINT 'Feriados actualizados: '  + CAST(ISNULL(@vActualizadas, 0) AS VARCHAR);
+        PRINT 'Feriados insertados:    ' + CAST(ISNULL(@vInsertadas,   0) AS VARCHAR);
+        PRINT 'Feriados actualizados:  ' + CAST(ISNULL(@vActualizadas, 0) AS VARCHAR);
 
     END TRY
     BEGIN CATCH
         ROLLBACK TRANSACTION;
-        IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL
-            DROP TABLE #vMergeOutput;
+        IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL DROP TABLE #vMergeOutput;
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarFeriados', @vUrl, ISNULL(@vFilas,0), 0, 0, 1);
         THROW;
     END CATCH;
+
+    INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+    VALUES ('parques.sp_ImportarFeriados', @vUrl, @vFilas,
+            ISNULL(@vInsertadas,0), ISNULL(@vActualizadas,0), 0);
 END
 GO
 

@@ -10,18 +10,14 @@
 --           Administracion de Parques Nacionales (APN)
 --   Formato: CSV UTF-8, separador punto y coma (;), campos entre comillas dobles
 --   Columnas: region, area_protegida, hectareas, categoria_internacional
---   Superficie: en hectareas (unidad oficial APN)
---   Estrategia: BULK INSERT en staging.AreasProtegidas ->
---               SP sp_ImportarAreasProtegidas hace UPSERT en:
---                 parques.TipoParque  (deriva tipo del prefijo del nombre)
---                 parques.Ubicacion   (usa centroide aproximado por region)
---                 parques.Parque      (nombre oficial + superficie en hectareas)
+--   Estrategia: BULK INSERT en tabla temporal #AreasProtegidas ->
+--               CURSOR -> parques.TipoParque_Insertar (si el tipo no existe) ->
+--               CURSOR -> parques.RegistrarParque (nuevo) o parques.Parque_Actualizar (existente)
 --
 --   NOTA sobre coordenadas: el CSV no incluye GPS. Se asignan coordenadas
 --   aproximadas (centroide de cada region) como punto de inicio.
---   Pueden actualizarse manualmente o mediante un dataset geografico posterior.
 --
--- Prerequisito: Ejecutar 01_tablas_staging.sql y los scripts de tablas del modulo parques.
+-- Prerequisito: Ejecutar 01_tablas_staging.sql y los scripts de tablas del modulo parques (E5).
 -- =============================================
 
 USE ParquesNacionales;
@@ -29,32 +25,44 @@ GO
 
 -- ============================================================
 -- SP: sp_ImportarAreasProtegidas
--- Carga el CSV de areas protegidas en staging y hace UPSERT
--- en TipoParque, Ubicacion y Parque.
--- Parametro: @vRutaArchivo = ruta completa al CSV en el servidor
 -- ============================================================
 CREATE OR ALTER PROCEDURE parques.sp_ImportarAreasProtegidas
     @vRutaArchivo NVARCHAR(500)
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @vSql        NVARCHAR(MAX);
-    DECLARE @vFilas      INT;
-    DECLARE @vInsertadas   INT = 0;
-    DECLARE @vActualizadas INT = 0;
+    DECLARE @vSql              NVARCHAR(MAX);
+    DECLARE @vFilas            INT = 0;
+    DECLARE @vInsertadas       INT = 0;
+    DECLARE @vActualizadas     INT = 0;
+
+    -- Cursor variables
+    DECLARE @vRegion           VARCHAR(100);
+    DECLARE @vAreaProtegida    VARCHAR(200);
+    DECLARE @vHectareas        VARCHAR(30);
+    DECLARE @vDescripcionTipo  VARCHAR(100);
+    DECLARE @vSuperficie       DECIMAL(18,2);
+    DECLARE @vLat              DECIMAL(9,6);
+    DECLARE @vLon              DECIMAL(9,6);
+    DECLARE @vIdTipoParque     INT;
+    DECLARE @vIdParque         INT;
+    DECLARE @vIdUbicacion      INT;
 
     -- --------------------------------------------------------
-    -- Paso 1: Limpiar staging
+    -- Paso 1: Tabla temporal de staging
     -- --------------------------------------------------------
-    TRUNCATE TABLE staging.AreasProtegidas;
+    CREATE TABLE #AreasProtegidas (
+        region                 VARCHAR(100)  NULL,
+        areaProtegida          VARCHAR(200)  NULL,
+        hectareas              VARCHAR(30)   NULL,
+        categoriaInternacional VARCHAR(100)  NULL
+    );
 
     -- --------------------------------------------------------
     -- Paso 2: BULK INSERT
-    -- Separador: ;   Campos entre comillas: si (FORMAT = 'CSV')
-    -- Requiere SQL Server 2017+ para FORMAT = 'CSV'
     -- --------------------------------------------------------
     SET @vSql = N'
-        BULK INSERT staging.AreasProtegidas
+        BULK INSERT #AreasProtegidas
         FROM ''' + @vRutaArchivo + N'''
         WITH (
             FORMAT           = ''CSV'',
@@ -67,15 +75,13 @@ BEGIN
     ';
     EXEC sp_executesql @vSql;
 
-    SELECT @vFilas = COUNT(*) FROM staging.AreasProtegidas;
-    PRINT 'Filas cargadas en staging: ' + CAST(@vFilas AS VARCHAR);
+    SELECT @vFilas = COUNT(*) FROM #AreasProtegidas;
+    PRINT 'Filas cargadas en staging temporal: ' + CAST(@vFilas AS VARCHAR);
 
     -- --------------------------------------------------------
-    -- Paso 3: Poblar parques.TipoParque
-    -- Deriva el tipo del prefijo del nombre del area protegida.
+    -- Paso 3: Insertar TipoParque (si no existe) via SP de E5
     -- --------------------------------------------------------
-    MERGE parques.TipoParque AS destino
-    USING (
+    DECLARE tipo_cursor CURSOR LOCAL FAST_FORWARD FOR
         SELECT DISTINCT
             CASE
                 WHEN areaProtegida LIKE 'Parque Nacional%'              THEN 'Parque Nacional'
@@ -84,133 +90,213 @@ BEGIN
                 WHEN areaProtegida LIKE 'Reserva Natural%'              THEN 'Reserva Natural'
                 WHEN areaProtegida LIKE 'Monumento Natural%'            THEN 'Monumento Natural'
                 ELSE 'Otra Area Protegida'
-            END AS descripcion
-        FROM staging.AreasProtegidas
-        WHERE areaProtegida IS NOT NULL
-    ) AS origen
-    ON destino.descripcion = origen.descripcion
-    WHEN NOT MATCHED THEN
-        INSERT (descripcion) VALUES (origen.descripcion);
+            END
+        FROM #AreasProtegidas
+        WHERE areaProtegida IS NOT NULL;
 
+    OPEN tipo_cursor;
+    FETCH NEXT FROM tipo_cursor INTO @vDescripcionTipo;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM parques.TipoParque WHERE descripcion = @vDescripcionTipo)
+        BEGIN
+            BEGIN TRY
+                EXEC parques.TipoParque_Insertar @descripcion = @vDescripcionTipo;
+            END TRY
+            BEGIN CATCH
+                PRINT 'Aviso: no se pudo insertar TipoParque "' + @vDescripcionTipo + '": ' + ERROR_MESSAGE();
+            END CATCH
+        END
+        FETCH NEXT FROM tipo_cursor INTO @vDescripcionTipo;
+    END
+    CLOSE tipo_cursor;
+    DEALLOCATE tipo_cursor;
     PRINT 'TipoParque actualizado.';
 
     -- --------------------------------------------------------
-    -- Paso 4: Poblar parques.Ubicacion
-    -- Una ubicacion por area protegida, usando coordenadas
-    -- aproximadas del centroide de cada region de la APN.
-    -- Mapa de regiones -> (latitud, longitud) centroide aprox.:
-    --   Centro            -> (-31.00, -67.50)   San Juan / Mendoza / Cordoba
-    --   Centro este       -> (-32.00, -60.50)   Entre Rios / Santa Fe
-    --   Nea               -> (-27.00, -57.00)   Corrientes / Misiones / Chaco
-    --   Noa               -> (-24.00, -65.00)   Salta / Jujuy / Tucuman
-    --   Patagonia norte   -> (-41.00, -71.00)   Neuquen / Rio Negro / Chubut norte
-    --   Patagonia austral -> (-50.00, -70.00)   Santa Cruz / Tierra del Fuego
-    --   Mar Argentino     -> (-50.00, -58.00)   Offshore Atlantico Sur
+    -- Paso 4: Insertar / actualizar Parques via SPs de E5
+    -- Usa parques.RegistrarParque (nuevo) o parques.Parque_Actualizar (existente).
+    -- Coordenadas aproximadas por region (centroide APN).
     -- --------------------------------------------------------
-    MERGE parques.Ubicacion AS destino
-    USING (
-        SELECT
-            areaProtegida                      AS direccion,
-            LOWER(LTRIM(RTRIM(region)))        AS provincia,  -- usamos region como provincia
-            CASE LOWER(LTRIM(RTRIM(region)))
-                WHEN 'centro'             THEN CAST(-31.00 AS DECIMAL(9,6))
-                WHEN 'centro este'        THEN CAST(-32.00 AS DECIMAL(9,6))
-                WHEN 'nea'                THEN CAST(-27.00 AS DECIMAL(9,6))
-                WHEN 'noa'                THEN CAST(-24.00 AS DECIMAL(9,6))
-                WHEN 'patagonia norte'    THEN CAST(-41.00 AS DECIMAL(9,6))
-                WHEN 'patagonia austral'  THEN CAST(-50.00 AS DECIMAL(9,6))
-                WHEN 'mar argentino'      THEN CAST(-50.00 AS DECIMAL(9,6))
-                ELSE                           CAST(-35.00 AS DECIMAL(9,6))  -- centroide ARG
-            END AS latitud,
-            CASE LOWER(LTRIM(RTRIM(region)))
-                WHEN 'centro'             THEN CAST(-67.50 AS DECIMAL(9,6))
-                WHEN 'centro este'        THEN CAST(-60.50 AS DECIMAL(9,6))
-                WHEN 'nea'                THEN CAST(-57.00 AS DECIMAL(9,6))
-                WHEN 'noa'                THEN CAST(-65.00 AS DECIMAL(9,6))
-                WHEN 'patagonia norte'    THEN CAST(-71.00 AS DECIMAL(9,6))
-                WHEN 'patagonia austral'  THEN CAST(-70.00 AS DECIMAL(9,6))
-                WHEN 'mar argentino'      THEN CAST(-58.00 AS DECIMAL(9,6))
-                ELSE                           CAST(-65.00 AS DECIMAL(9,6))  -- centroide ARG
-            END AS longitud
-        FROM staging.AreasProtegidas
+    DECLARE parque_cursor CURSOR LOCAL FAST_FORWARD FOR
+        SELECT region, areaProtegida, hectareas
+        FROM #AreasProtegidas
         WHERE areaProtegida IS NOT NULL
-          AND region IS NOT NULL
-    ) AS origen
-    ON destino.direccion = origen.direccion
-    WHEN NOT MATCHED THEN
-        INSERT (direccion, provincia, latitud, longitud)
-        VALUES (origen.direccion, origen.provincia, origen.latitud, origen.longitud)
-    WHEN MATCHED THEN
-        UPDATE SET
-            destino.provincia = origen.provincia;
-    -- Nota: no actualizamos lat/lon para preservar coordenadas precisas si ya existen
+          AND hectareas IS NOT NULL
+          AND LTRIM(RTRIM(hectareas)) != '';
 
-    PRINT 'Ubicaciones actualizadas.';
+    OPEN parque_cursor;
+    FETCH NEXT FROM parque_cursor INTO @vRegion, @vAreaProtegida, @vHectareas;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        -- Calcular superficie
+        SET @vSuperficie = TRY_CAST(
+            REPLACE(LTRIM(RTRIM(@vHectareas)), '.', '')
+            AS DECIMAL(18,2)
+        );
+
+        -- Derivar tipo del nombre
+        SET @vDescripcionTipo = CASE
+            WHEN @vAreaProtegida LIKE 'Parque Nacional%'              THEN 'Parque Nacional'
+            WHEN @vAreaProtegida LIKE 'Parque Interjurisdiccional%'   THEN 'Parque Interjurisdiccional'
+            WHEN @vAreaProtegida LIKE 'Reserva Nacional%'             THEN 'Reserva Nacional'
+            WHEN @vAreaProtegida LIKE 'Reserva Natural%'              THEN 'Reserva Natural'
+            WHEN @vAreaProtegida LIKE 'Monumento Natural%'            THEN 'Monumento Natural'
+            ELSE 'Otra Area Protegida'
+        END;
+
+        SELECT @vIdTipoParque = idTipoParque
+        FROM parques.TipoParque
+        WHERE descripcion = @vDescripcionTipo;
+
+        -- Coordenadas aproximadas por region APN
+        SET @vLat = CASE LOWER(LTRIM(RTRIM(@vRegion)))
+            WHEN 'centro'             THEN CAST(-31.00 AS DECIMAL(9,6))
+            WHEN 'centro este'        THEN CAST(-32.00 AS DECIMAL(9,6))
+            WHEN 'nea'                THEN CAST(-27.00 AS DECIMAL(9,6))
+            WHEN 'noa'                THEN CAST(-24.00 AS DECIMAL(9,6))
+            WHEN 'patagonia norte'    THEN CAST(-41.00 AS DECIMAL(9,6))
+            WHEN 'patagonia austral'  THEN CAST(-50.00 AS DECIMAL(9,6))
+            WHEN 'mar argentino'      THEN CAST(-50.00 AS DECIMAL(9,6))
+            ELSE                           CAST(-35.00 AS DECIMAL(9,6))
+        END;
+
+        SET @vLon = CASE LOWER(LTRIM(RTRIM(@vRegion)))
+            WHEN 'centro'             THEN CAST(-67.50 AS DECIMAL(9,6))
+            WHEN 'centro este'        THEN CAST(-60.50 AS DECIMAL(9,6))
+            WHEN 'nea'                THEN CAST(-57.00 AS DECIMAL(9,6))
+            WHEN 'noa'                THEN CAST(-65.00 AS DECIMAL(9,6))
+            WHEN 'patagonia norte'    THEN CAST(-71.00 AS DECIMAL(9,6))
+            WHEN 'patagonia austral'  THEN CAST(-70.00 AS DECIMAL(9,6))
+            WHEN 'mar argentino'      THEN CAST(-58.00 AS DECIMAL(9,6))
+            ELSE                           CAST(-65.00 AS DECIMAL(9,6))
+        END;
+
+        IF @vSuperficie IS NOT NULL AND @vSuperficie > 0 AND @vIdTipoParque IS NOT NULL
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM parques.Parque WHERE nombre = @vAreaProtegida)
+            BEGIN
+                -- Parque nuevo: usar SP de negocio (crea Ubicacion + Parque)
+                BEGIN TRY
+                    EXEC parques.RegistrarParque
+                        @nombre       = @vAreaProtegida,
+                        @superficie   = @vSuperficie,
+                        @idTipoParque = @vIdTipoParque,
+                        @direccion    = @vAreaProtegida,
+                        @provincia    = @vRegion,
+                        @latitud      = @vLat,
+                        @longitud     = @vLon;
+                    SET @vInsertadas += 1;
+                END TRY
+                BEGIN CATCH
+                    PRINT 'Error al insertar parque "' + @vAreaProtegida + '": ' + ERROR_MESSAGE();
+                END CATCH
+            END
+            ELSE
+            BEGIN
+                -- Parque existente: actualizar solo superficie si cambio
+                SELECT @vIdParque    = idParque,
+                       @vIdUbicacion = idUbicacion,
+                       @vIdTipoParque = idTipoParque
+                FROM parques.Parque
+                WHERE nombre = @vAreaProtegida;
+
+                BEGIN TRY
+                    EXEC parques.Parque_Actualizar
+                        @idParque     = @vIdParque,
+                        @nombre       = @vAreaProtegida,
+                        @superficie   = @vSuperficie,
+                        @idTipoParque = @vIdTipoParque,
+                        @idUbicacion  = @vIdUbicacion;
+                    SET @vActualizadas += 1;
+                END TRY
+                BEGIN CATCH
+                    PRINT 'Error al actualizar parque "' + @vAreaProtegida + '": ' + ERROR_MESSAGE();
+                END CATCH
+            END
+        END
+
+        FETCH NEXT FROM parque_cursor INTO @vRegion, @vAreaProtegida, @vHectareas;
+    END
+    CLOSE parque_cursor;
+    DEALLOCATE parque_cursor;
+
+    PRINT 'Importacion de areas protegidas completada.';
+    PRINT 'Filas CSV procesadas: '  + CAST(@vFilas         AS VARCHAR);
+    PRINT 'Parques insertados:   '  + CAST(@vInsertadas    AS VARCHAR);
+    PRINT 'Parques actualizados: '  + CAST(@vActualizadas  AS VARCHAR);
+
 
     -- --------------------------------------------------------
-    -- Paso 5: UPSERT en parques.Parque
+    -- Paso 5: Seed de ventas.TipoVisitante y ventas.PrecioEntrada
+    -- Asegura que los tipos de visitante existen y crea precios
+    -- iniciales para cada parque x tipo que no tenga precio vigente.
+    -- Residente:    $ 10.000 ARS
+    -- No Residente: USD 20 x tipo de cambio oficial (o $ 10.000 si no hay TC)
     -- --------------------------------------------------------
-    CREATE TABLE #vMergeOutput (accion NVARCHAR(10));
+    IF NOT EXISTS (SELECT 1 FROM ventas.TipoVisitante WHERE descripcion = 'Residente')
+        EXEC ventas.TipoVisitante_Insertar @descripcion = 'Residente';
+    IF NOT EXISTS (SELECT 1 FROM ventas.TipoVisitante WHERE descripcion = 'No Residente')
+        EXEC ventas.TipoVisitante_Insertar @descripcion = 'No Residente';
 
-    BEGIN TRANSACTION;
-    BEGIN TRY
-        MERGE parques.Parque AS destino
-        USING (
-            SELECT
-                s.areaProtegida                         AS nombre,
-                TRY_CAST(
-                    REPLACE(LTRIM(RTRIM(s.hectareas)), '.', '')
-                    AS DECIMAL(18,2)
-                )                                       AS superficie,  -- en hectareas
-                tp.idTipoParque,
-                u.idUbicacion
-            FROM staging.AreasProtegidas s
-            JOIN parques.TipoParque tp
-              ON tp.descripcion = CASE
-                    WHEN s.areaProtegida LIKE 'Parque Nacional%'            THEN 'Parque Nacional'
-                    WHEN s.areaProtegida LIKE 'Parque Interjurisdiccional%' THEN 'Parque Interjurisdiccional'
-                    WHEN s.areaProtegida LIKE 'Reserva Nacional%'           THEN 'Reserva Nacional'
-                    WHEN s.areaProtegida LIKE 'Reserva Natural%'            THEN 'Reserva Natural'
-                    WHEN s.areaProtegida LIKE 'Monumento Natural%'          THEN 'Monumento Natural'
-                    ELSE 'Otra Area Protegida'
-                 END
-            JOIN parques.Ubicacion u
-              ON u.direccion = s.areaProtegida
-            WHERE s.areaProtegida IS NOT NULL
-              AND s.hectareas IS NOT NULL
-        ) AS origen
-        ON destino.nombre = origen.nombre
+    DECLARE @vTCVenta       DECIMAL(10,2);
+    DECLARE @vFechaSeed     DATE = CAST(GETDATE() AS DATE);
+    DECLARE @vIdParqueSeed  INT;
+    DECLARE @vIdTVSeed      INT;
+    DECLARE @vDescTVSeed    VARCHAR(100);
+    DECLARE @vValorSeed     DECIMAL(18,2);
 
-        WHEN MATCHED AND destino.superficie != origen.superficie THEN
-            UPDATE SET destino.superficie = origen.superficie
+    SELECT TOP 1 @vTCVenta = venta
+    FROM parques.TipoCambio
+    WHERE tipo = 'oficial'
+    ORDER BY fecha DESC;
 
-        WHEN NOT MATCHED BY TARGET THEN
-            INSERT (nombre, superficie, idTipoParque, idUbicacion)
-            VALUES (origen.nombre, origen.superficie, origen.idTipoParque, origen.idUbicacion)
+    DECLARE precio_seed CURSOR LOCAL FAST_FORWARD FOR
+        SELECT p.idParque, tv.idTipoVisitante, tv.descripcion
+        FROM parques.Parque p
+        CROSS JOIN ventas.TipoVisitante tv
+        WHERE NOT EXISTS (
+            SELECT 1 FROM ventas.PrecioEntrada pe
+            WHERE pe.idParque        = p.idParque
+              AND pe.idTipoVisitante = tv.idTipoVisitante
+              AND (pe.fechaHasta IS NULL OR pe.fechaHasta >= @vFechaSeed)
+        );
 
-        OUTPUT $action INTO #vMergeOutput (accion);
+    OPEN precio_seed;
+    FETCH NEXT FROM precio_seed INTO @vIdParqueSeed, @vIdTVSeed, @vDescTVSeed;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SET @vValorSeed = CASE @vDescTVSeed
+            WHEN 'Residente'    THEN 10000.00
+            WHEN 'No Residente' THEN
+                CASE WHEN @vTCVenta > 0
+                     THEN CAST(20.00 * @vTCVenta AS DECIMAL(18,2))
+                     ELSE 10000.00
+                END
+            ELSE 10000.00
+        END;
 
-        SELECT
-            @vInsertadas   = SUM(CASE WHEN accion = 'INSERT' THEN 1 ELSE 0 END),
-            @vActualizadas = SUM(CASE WHEN accion = 'UPDATE' THEN 1 ELSE 0 END)
-        FROM #vMergeOutput;
+        BEGIN TRY
+            EXEC ventas.PrecioEntrada_Insertar
+                @fechaActualizacion = @vFechaSeed,
+                @valor              = @vValorSeed,
+                @idParque           = @vIdParqueSeed,
+                @idTipoVisitante    = @vIdTVSeed,
+                @fechaHasta         = NULL;
+        END TRY
+        BEGIN CATCH
+            PRINT 'Aviso precio parque ' + CAST(@vIdParqueSeed AS VARCHAR)
+                + ' / ' + @vDescTVSeed + ': ' + ERROR_MESSAGE();
+        END CATCH
 
-        DROP TABLE #vMergeOutput;
+        FETCH NEXT FROM precio_seed INTO @vIdParqueSeed, @vIdTVSeed, @vDescTVSeed;
+    END
+    CLOSE precio_seed; DEALLOCATE precio_seed;
+    PRINT 'Seed de PrecioEntrada completado.';
 
-        COMMIT TRANSACTION;
-
-        PRINT 'Importacion de areas protegidas completada.';
-        PRINT 'Filas CSV procesadas: '  + CAST(@vFilas      AS VARCHAR);
-        PRINT 'Parques insertados: '    + CAST(ISNULL(@vInsertadas,   0) AS VARCHAR);
-        PRINT 'Parques actualizados: '  + CAST(ISNULL(@vActualizadas, 0) AS VARCHAR);
-
-    END TRY
-    BEGIN CATCH
-        ROLLBACK TRANSACTION;
-        IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL
-            DROP TABLE #vMergeOutput;
-        THROW;
-    END CATCH;
+    INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+    VALUES ('parques.sp_ImportarAreasProtegidas', @vRutaArchivo, @vFilas,
+            @vInsertadas, @vActualizadas, 0);
 END
 GO
 

@@ -9,44 +9,40 @@
 --   Origen: https://datos.yvera.gob.ar (Ministerio de Turismo y Deporte)
 --   Formato: CSV UTF-8 con BOM, separador coma
 --   Columnas: indice_tiempo, region_de_destino, origen_visitantes, visitas, observaciones
---   Regiones: buenos aires, cordoba, cuyo, litoral, norte, patagonia
---   Nota: indice_tiempo viene como YYYY-M-DD (ej. 2008-1-01). Se convierte
---         a DATE usando DATEFROMPARTS para garantizar el primer dia del mes.
---   Estrategia: BULK INSERT en staging.VisitasPorRegion ->
---               SP sp_ImportarVisitasPorRegion hace UPSERT en parques.EstadisticaVisitasPorRegion
+--   Estrategia: BULK INSERT en tabla temporal #VisitasPorRegion ->
+--               UPSERT en parques.EstadisticaVisitasPorRegion
 -- Prerequisito: Ejecutar 01_tablas_staging.sql
 -- =============================================
 
 USE ParquesNacionales;
 GO
 
--- ============================================================
--- SP: sp_ImportarVisitasPorRegion
--- Carga el CSV de visitas por region en staging y luego
--- hace el upsert hacia la tabla final.
--- Parametro: @vRutaArchivo = ruta completa al CSV en el servidor
--- ============================================================
 CREATE OR ALTER PROCEDURE parques.sp_ImportarVisitasPorRegion
     @vRutaArchivo NVARCHAR(500)
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @vSql        NVARCHAR(MAX);
-    DECLARE @vFilas      INT;
+    DECLARE @vSql          NVARCHAR(MAX);
+    DECLARE @vFilas        INT;
     DECLARE @vInsertadas   INT = 0;
     DECLARE @vActualizadas INT = 0;
 
     -- --------------------------------------------------------
-    -- Paso 1: Limpiar staging antes de la carga
+    -- Paso 1: Tabla temporal de staging
     -- --------------------------------------------------------
-    TRUNCATE TABLE staging.VisitasPorRegion;
+    CREATE TABLE #VisitasPorRegion (
+        indiceTiempo      VARCHAR(20)   NULL,
+        regionDestino     VARCHAR(100)  NULL,
+        origenVisitantes  VARCHAR(50)   NULL,
+        visitas           VARCHAR(20)   NULL,
+        observaciones     VARCHAR(500)  NULL
+    );
 
     -- --------------------------------------------------------
-    -- Paso 2: BULK INSERT del CSV en staging
-    -- El CSV tiene BOM UTF-8 (CODEPAGE 65001) y encabezado en fila 1.
+    -- Paso 2: BULK INSERT
     -- --------------------------------------------------------
     SET @vSql = N'
-        BULK INSERT staging.VisitasPorRegion
+        BULK INSERT #VisitasPorRegion
         FROM ''' + @vRutaArchivo + N'''
         WITH (
             FIELDTERMINATOR  = '','',
@@ -58,8 +54,8 @@ BEGIN
     ';
     EXEC sp_executesql @vSql;
 
-    SELECT @vFilas = COUNT(*) FROM staging.VisitasPorRegion;
-    PRINT 'Filas cargadas en staging: ' + CAST(@vFilas AS VARCHAR);
+    SELECT @vFilas = COUNT(*) FROM #VisitasPorRegion;
+    PRINT 'Filas cargadas en staging temporal: ' + CAST(@vFilas AS VARCHAR);
 
     -- --------------------------------------------------------
     -- Paso 3: Transformacion y UPSERT hacia tabla final
@@ -80,9 +76,9 @@ BEGIN
                 LOWER(LTRIM(RTRIM(origenVisitantes)))           AS origenVisitante,
                 CAST(NULLIF(LTRIM(RTRIM(visitas)), '') AS INT)  AS cantidadVisitas,
                 NULLIF(LTRIM(RTRIM(observaciones)), '')         AS observaciones
-            FROM staging.VisitasPorRegion
-            WHERE indiceTiempo    IS NOT NULL
-              AND regionDestino   IS NOT NULL
+            FROM #VisitasPorRegion
+            WHERE indiceTiempo     IS NOT NULL
+              AND regionDestino    IS NOT NULL
               AND origenVisitantes IS NOT NULL
               AND visitas IS NOT NULL
               AND visitas != ''
@@ -112,21 +108,25 @@ BEGIN
         FROM #vMergeOutput;
 
         DROP TABLE #vMergeOutput;
-
         COMMIT TRANSACTION;
 
         PRINT 'Importacion por region completada exitosamente.';
-        PRINT 'Filas procesadas desde CSV: ' + CAST(@vFilas AS VARCHAR);
-        PRINT 'Filas insertadas: '    + CAST(ISNULL(@vInsertadas, 0)   AS VARCHAR);
-        PRINT 'Filas actualizadas: '  + CAST(ISNULL(@vActualizadas, 0) AS VARCHAR);
+        PRINT 'Filas leidas del CSV:  ' + CAST(@vFilas AS VARCHAR);
+        PRINT 'Filas insertadas:      ' + CAST(ISNULL(@vInsertadas,   0) AS VARCHAR);
+        PRINT 'Filas actualizadas:    ' + CAST(ISNULL(@vActualizadas, 0) AS VARCHAR);
 
     END TRY
     BEGIN CATCH
         ROLLBACK TRANSACTION;
-        IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL
-            DROP TABLE #vMergeOutput;
+        IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL DROP TABLE #vMergeOutput;
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarVisitasPorRegion', @vRutaArchivo, ISNULL(@vFilas,0), 0, 0, 1);
         THROW;
     END CATCH;
+
+    INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+    VALUES ('parques.sp_ImportarVisitasPorRegion', @vRutaArchivo, @vFilas,
+            ISNULL(@vInsertadas,0), ISNULL(@vActualizadas,0), 0);
 END
 GO
 

@@ -40,7 +40,6 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Validacion del parametro
     IF @vTipo NOT IN ('oficial', 'blue', 'tarjeta', 'mayorista', 'bolsa', 'cripto')
     BEGIN
         RAISERROR('- Tipo de cambio invalido. Valores validos: oficial, blue, tarjeta, mayorista, bolsa, cripto.', 16, 1);
@@ -64,6 +63,8 @@ BEGIN
     EXEC @vHrResult = sp_OACreate 'MSXML2.ServerXMLHTTP', @vObjHttp OUT;
     IF @vHrResult <> 0
     BEGIN
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al crear objeto HTTP. Verificar que Ole Automation este habilitado.', 16, 1);
         RETURN;
     END
@@ -72,6 +73,8 @@ BEGIN
     IF @vHrResult <> 0
     BEGIN
         EXEC sp_OADestroy @vObjHttp;
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al abrir conexion HTTP con dolarapi.com.', 16, 1);
         RETURN;
     END
@@ -81,6 +84,8 @@ BEGIN
     IF @vHrResult <> 0
     BEGIN
         EXEC sp_OADestroy @vObjHttp;
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al enviar peticion HTTP.', 16, 1);
         RETURN;
     END
@@ -90,6 +95,8 @@ BEGIN
 
     IF @vRespuesta IS NULL OR LEN(@vRespuesta) < 10
     BEGIN
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- La API no devolvio datos. Verificar conectividad a dolarapi.com.', 16, 1);
         RETURN;
     END
@@ -97,9 +104,7 @@ BEGIN
     PRINT 'Respuesta recibida: ' + @vRespuesta;
 
     -- --------------------------------------------------------
-    -- Paso 2: Parsear JSON con OPENJSON (SQL Server 2016+)
-    -- Respuesta: {"moneda":"USD","casa":"oficial","nombre":"Oficial",
-    --             "compra":1100.50,"venta":1120.50,"fechaActualizacion":"..."}
+    -- Paso 2: Parsear JSON
     -- --------------------------------------------------------
     SELECT
         @vCompra = TRY_CAST(JSON_VALUE(@vRespuesta, '$.compra') AS DECIMAL(10,2)),
@@ -107,20 +112,29 @@ BEGIN
 
     IF @vCompra IS NULL OR @vVenta IS NULL
     BEGIN
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- No se pudieron parsear los valores de compra/venta del JSON.', 16, 1);
         RETURN;
     END
 
     IF @vCompra <= 0 OR @vVenta < @vCompra
     BEGIN
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Valores de tipo de cambio invalidos recibidos de la API.', 16, 1);
         RETURN;
     END
 
     -- --------------------------------------------------------
     -- Paso 3: UPSERT en parques.TipoCambio
-    -- Si ya existe el tipo para hoy, actualiza; sino inserta.
     -- --------------------------------------------------------
+    DECLARE @vExistia BIT;
+
+    SET @vExistia = CASE WHEN EXISTS (
+        SELECT 1 FROM parques.TipoCambio WHERE fecha = @vFecha AND tipo = @vTipo
+    ) THEN 1 ELSE 0 END;
+
     BEGIN TRANSACTION;
     BEGIN TRY
         MERGE parques.TipoCambio AS destino
@@ -138,7 +152,7 @@ BEGIN
 
         WHEN NOT MATCHED THEN
             INSERT (fecha, tipo, compra, venta)
-            VALUES (origen.fecha, origen.tipo, origen.compra, origen.venta);
+            VALUES (origen.fecha, origen.tipo, origen.compra, origen.venta)
 
         COMMIT TRANSACTION;
 
@@ -153,8 +167,40 @@ BEGIN
     END TRY
     BEGIN CATCH
         ROLLBACK TRANSACTION;
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 1, 0, 0, 1);
         THROW;
     END CATCH;
+
+
+    -- --------------------------------------------------------
+    -- Actualizar PrecioEntrada para No Residente con el nuevo tipo de cambio
+    -- Solo aplica al tipo 'oficial' ya que es el que usa el sistema de ventas.
+    -- --------------------------------------------------------
+    IF @vTipo = 'oficial'
+    BEGIN
+        DECLARE @vIdNoResidente INT;
+        SELECT @vIdNoResidente = idTipoVisitante
+        FROM ventas.TipoVisitante
+        WHERE descripcion = 'No Residente';
+
+        IF @vIdNoResidente IS NOT NULL
+        BEGIN
+            UPDATE ventas.PrecioEntrada
+            SET valor = CAST(20.00 * @vVenta AS DECIMAL(18,2))
+            WHERE idTipoVisitante = @vIdNoResidente
+              AND (fechaHasta IS NULL OR fechaHasta >= @vFecha);
+
+            PRINT 'PrecioEntrada No Residente actualizado: $ '
+                + CAST(CAST(20.00 * @vVenta AS DECIMAL(18,2)) AS VARCHAR)
+                + ' ARS (USD 20 x ' + CAST(@vVenta AS VARCHAR) + ')';
+        END
+    END
+
+    INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+    VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 1,
+            CASE WHEN @vExistia = 0 THEN 1 ELSE 0 END,
+            CASE WHEN @vExistia = 1 THEN 1 ELSE 0 END, 0);
 END
 GO
 

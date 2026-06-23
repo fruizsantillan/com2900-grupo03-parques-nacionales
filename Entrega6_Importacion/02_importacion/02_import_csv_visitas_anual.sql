@@ -6,46 +6,41 @@
 -- Fecha: 15/06/2026
 -- Descripcion: Importacion de distribucion anual de visitas desde CSV oficial de APN.
 --   Fuente: aprn_i_visitas_porc_2024.csv
---   Origen: https://datos.gob.ar/dataset/ambiente-areas-protegidas-nacionales
---           Administracion de Parques Nacionales (APN)
+--   Origen: https://datos.gob.ar/dataset/ambiente-areas-protegidas-nacionales (APN)
 --   Formato: CSV UTF-8, separador punto y coma (;), campos entre comillas dobles
 --   Columnas: anio, residentes_en_porcentaje, no_residentes_en_porcentaje
---   Rango: 2008-2025 (18 registros anuales)
---   Estrategia: BULK INSERT en staging.VisitasPorcentajeAnual ->
---               SP sp_ImportarVisitasAnual hace UPSERT en parques.EstadisticaVisitasAnual
+--   Estrategia: BULK INSERT en tabla temporal #VisitasPorcentajeAnual ->
+--               UPSERT en parques.EstadisticaVisitasAnual
 -- Prerequisito: Ejecutar 01_tablas_staging.sql
 -- =============================================
 
 USE ParquesNacionales;
 GO
 
--- ============================================================
--- SP: sp_ImportarVisitasAnual
--- Carga el CSV de porcentajes anuales en staging y hace UPSERT
--- en la tabla final parques.EstadisticaVisitasAnual.
--- Parametro: @vRutaArchivo = ruta completa al CSV en el servidor
--- ============================================================
 CREATE OR ALTER PROCEDURE parques.sp_ImportarVisitasAnual
     @vRutaArchivo NVARCHAR(500)
 AS
 BEGIN
     SET NOCOUNT ON;
-    DECLARE @vSql        NVARCHAR(MAX);
-    DECLARE @vFilas      INT;
+    DECLARE @vSql          NVARCHAR(MAX);
+    DECLARE @vFilas        INT;
     DECLARE @vInsertadas   INT = 0;
     DECLARE @vActualizadas INT = 0;
 
     -- --------------------------------------------------------
-    -- Paso 1: Limpiar staging
+    -- Paso 1: Tabla temporal de staging
     -- --------------------------------------------------------
-    TRUNCATE TABLE staging.VisitasPorcentajeAnual;
+    CREATE TABLE #VisitasPorcentajeAnual (
+        anio                    VARCHAR(10)  NULL,
+        residentesPorcentaje    VARCHAR(10)  NULL,
+        noResidentesPorcentaje  VARCHAR(10)  NULL
+    );
 
     -- --------------------------------------------------------
-    -- Paso 2: BULK INSERT
-    -- Separador: ;   Campos entre comillas: si (FORMAT = 'CSV')
+    -- Paso 2: BULK INSERT (separador ;, campos entre comillas)
     -- --------------------------------------------------------
     SET @vSql = N'
-        BULK INSERT staging.VisitasPorcentajeAnual
+        BULK INSERT #VisitasPorcentajeAnual
         FROM ''' + @vRutaArchivo + N'''
         WITH (
             FORMAT           = ''CSV'',
@@ -58,8 +53,8 @@ BEGIN
     ';
     EXEC sp_executesql @vSql;
 
-    SELECT @vFilas = COUNT(*) FROM staging.VisitasPorcentajeAnual;
-    PRINT 'Filas cargadas en staging: ' + CAST(@vFilas AS VARCHAR);
+    SELECT @vFilas = COUNT(*) FROM #VisitasPorcentajeAnual;
+    PRINT 'Filas cargadas en staging temporal: ' + CAST(@vFilas AS VARCHAR);
 
     -- --------------------------------------------------------
     -- Paso 3: UPSERT hacia tabla final
@@ -74,7 +69,7 @@ BEGIN
                 CAST(LTRIM(RTRIM(anio))                   AS INT)          AS anio,
                 CAST(LTRIM(RTRIM(residentesPorcentaje))   AS DECIMAL(5,2)) AS residentesPorcentaje,
                 CAST(LTRIM(RTRIM(noResidentesPorcentaje)) AS DECIMAL(5,2)) AS noResidentesPorcentaje
-            FROM staging.VisitasPorcentajeAnual
+            FROM #VisitasPorcentajeAnual
             WHERE anio IS NOT NULL
               AND residentesPorcentaje IS NOT NULL
               AND noResidentesPorcentaje IS NOT NULL
@@ -101,21 +96,25 @@ BEGIN
         FROM #vMergeOutput;
 
         DROP TABLE #vMergeOutput;
-
         COMMIT TRANSACTION;
 
         PRINT 'Importacion de estadisticas anuales completada.';
-        PRINT 'Filas procesadas: '    + CAST(@vFilas               AS VARCHAR);
-        PRINT 'Registros insertados: ' + CAST(ISNULL(@vInsertadas,   0) AS VARCHAR);
-        PRINT 'Registros actualizados: '+ CAST(ISNULL(@vActualizadas, 0) AS VARCHAR);
+        PRINT 'Filas leidas del CSV:    ' + CAST(@vFilas AS VARCHAR);
+        PRINT 'Registros insertados:    ' + CAST(ISNULL(@vInsertadas,   0) AS VARCHAR);
+        PRINT 'Registros actualizados:  ' + CAST(ISNULL(@vActualizadas, 0) AS VARCHAR);
 
     END TRY
     BEGIN CATCH
         ROLLBACK TRANSACTION;
-        IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL
-            DROP TABLE #vMergeOutput;
+        IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL DROP TABLE #vMergeOutput;
+        INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+        VALUES ('parques.sp_ImportarVisitasAnual', @vRutaArchivo, ISNULL(@vFilas,0), 0, 0, 1);
         THROW;
     END CATCH;
+
+    INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
+    VALUES ('parques.sp_ImportarVisitasAnual', @vRutaArchivo, @vFilas,
+            ISNULL(@vInsertadas,0), ISNULL(@vActualizadas,0), 0);
 END
 GO
 
@@ -123,11 +122,6 @@ GO
 -- NOTA DE USO:
 -- EXEC parques.sp_ImportarVisitasAnual
 --     @vRutaArchivo = 'C:\TP_ParquesNacionales\datasets\aprn_i_visitas_porc_2024.csv';
---
--- Verificacion:
---   SELECT anio, residentesPorcentaje, noResidentesPorcentaje
---   FROM parques.EstadisticaVisitasAnual
---   ORDER BY anio;
 -- ============================================================
 PRINT 'SP parques.sp_ImportarVisitasAnual creado correctamente.';
 GO
