@@ -63,7 +63,7 @@ BEGIN
             TABLOCK
         );
     ';
-    EXEC executesql @vSql;
+    EXEC sp_executesql @vSql;
 
     SELECT @vFilas = COUNT(*) FROM #VisitasNacionales;
     PRINT 'Filas cargadas en staging temporal: ' + CAST(@vFilas AS VARCHAR);
@@ -202,7 +202,7 @@ BEGIN
             TABLOCK
         );
     ';
-    EXEC executesql @vSql;
+    EXEC sp_executesql @vSql;
 
     SELECT @vFilas = COUNT(*) FROM #VisitasPorRegion;
     PRINT 'Filas cargadas en staging temporal: ' + CAST(@vFilas AS VARCHAR);
@@ -341,7 +341,7 @@ BEGIN
             TABLOCK
         );
     ';
-    EXEC executesql @vSql;
+    EXEC sp_executesql @vSql;
 
     SELECT @vFilas = COUNT(*) FROM #VisitasPorcentajeAnual;
     PRINT 'Filas cargadas en staging temporal: ' + CAST(@vFilas AS VARCHAR);
@@ -473,7 +473,7 @@ BEGIN
     -- --------------------------------------------------------
     -- Paso 1: Llamada HTTP GET via OLE Automation
     -- --------------------------------------------------------
-    EXEC @vHrResult = OACreate 'MSXML2.ServerXMLHTTP', @vObjHttp OUT;
+    EXEC @vHrResult = sp_OACreate 'MSXML2.ServerXMLHTTP', @vObjHttp OUT;
     IF @vHrResult <> 0
     BEGIN
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
@@ -482,29 +482,29 @@ BEGIN
         RETURN;
     END
 
-    EXEC @vHrResult = OAMethod @vObjHttp, 'open', NULL, 'GET', @vUrl, false;
+    EXEC @vHrResult = sp_OAMethod @vObjHttp, 'open', NULL, 'GET', @vUrl, false;
     IF @vHrResult <> 0
     BEGIN
-        EXEC OADestroy @vObjHttp;
+        EXEC sp_OADestroy @vObjHttp;
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
         VALUES ('parques.ImportarFeriados', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al abrir conexion HTTP.', 16, 1);
         RETURN;
     END
 
-    EXEC @vHrResult = OAMethod @vObjHttp, 'setRequestHeader', NULL, 'Accept', 'application/json';
-    EXEC @vHrResult = OAMethod @vObjHttp, 'send';
+    EXEC @vHrResult = sp_OAMethod @vObjHttp, 'setRequestHeader', NULL, 'Accept', 'application/json';
+    EXEC @vHrResult = sp_OAMethod @vObjHttp, 'send';
     IF @vHrResult <> 0
     BEGIN
-        EXEC OADestroy @vObjHttp;
+        EXEC sp_OADestroy @vObjHttp;
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
         VALUES ('parques.ImportarFeriados', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al enviar peticion HTTP.', 16, 1);
         RETURN;
     END
 
-    EXEC @vHrResult = OAGetProperty @vObjHttp, 'responseText', @vRespuesta OUT;
-    EXEC OADestroy @vObjHttp;
+    EXEC @vHrResult = sp_OAGetProperty @vObjHttp, 'responseText', @vRespuesta OUT;
+    EXEC sp_OADestroy @vObjHttp;
 
     IF @vRespuesta IS NULL OR LEN(@vRespuesta) < 5
     BEGIN
@@ -673,7 +673,7 @@ BEGIN
     -- --------------------------------------------------------
     -- Paso 1: HTTP GET via OLE Automation
     -- --------------------------------------------------------
-    EXEC @vHrResult = OACreate 'MSXML2.ServerXMLHTTP', @vObjHttp OUT;
+    EXEC @vHrResult = sp_OACreate 'MSXML2.ServerXMLHTTP', @vObjHttp OUT;
     IF @vHrResult <> 0
     BEGIN
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
@@ -682,29 +682,29 @@ BEGIN
         RETURN;
     END
 
-    EXEC @vHrResult = OAMethod @vObjHttp, 'open', NULL, 'GET', @vUrl, false;
+    EXEC @vHrResult = sp_OAMethod @vObjHttp, 'open', NULL, 'GET', @vUrl, false;
     IF @vHrResult <> 0
     BEGIN
-        EXEC OADestroy @vObjHttp;
+        EXEC sp_OADestroy @vObjHttp;
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
         VALUES ('parques.ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al abrir conexion HTTP con dolarapi.com.', 16, 1);
         RETURN;
     END
 
-    EXEC OAMethod @vObjHttp, 'setRequestHeader', NULL, 'Accept', 'application/json';
-    EXEC @vHrResult = OAMethod @vObjHttp, 'send';
+    EXEC sp_OAMethod @vObjHttp, 'setRequestHeader', NULL, 'Accept', 'application/json';
+    EXEC @vHrResult = sp_OAMethod @vObjHttp, 'send';
     IF @vHrResult <> 0
     BEGIN
-        EXEC OADestroy @vObjHttp;
+        EXEC sp_OADestroy @vObjHttp;
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
         VALUES ('parques.ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al enviar peticion HTTP.', 16, 1);
         RETURN;
     END
 
-    EXEC OAGetProperty @vObjHttp, 'responseText', @vRespuesta OUT;
-    EXEC OADestroy @vObjHttp;
+    EXEC sp_OAGetProperty @vObjHttp, 'responseText', @vRespuesta OUT;
+    EXEC sp_OADestroy @vObjHttp;
 
     IF @vRespuesta IS NULL OR LEN(@vRespuesta) < 10
     BEGIN
@@ -950,7 +950,7 @@ BEGIN
             TABLOCK
         );
     ';
-    EXEC executesql @vSql;
+    EXEC sp_executesql @vSql;
 
     SELECT @vTotalStaging = COUNT(*) FROM #AreasWDPA;
     PRINT 'Filas cargadas en staging temporal: ' + CAST(@vTotalStaging AS VARCHAR);
@@ -1181,7 +1181,7 @@ BEGIN
             TABLOCK
         );
     ';
-    EXEC executesql @vSql;
+    EXEC sp_executesql @vSql;
 
     SELECT @vFilas = COUNT(*) FROM #AreasProtegidas;
     PRINT 'Filas cargadas en staging temporal: ' + CAST(@vFilas AS VARCHAR);
