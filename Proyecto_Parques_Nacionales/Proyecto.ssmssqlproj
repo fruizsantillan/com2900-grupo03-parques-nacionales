@@ -1,0 +1,249 @@
+<?xml version="1.0"?>
+<SqlWorkbenchSqlProject xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Name="Proyecto">
+  <Items>
+    <LogicalFolder Name="Conexiones" Type="2" Sorted="true">
+      <Items />
+    </LogicalFolder>
+    <LogicalFolder Name="Consultas" Type="0" Sorted="true">
+      <Items>
+        <FileNode Name="00_eliminacion_db.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>00_eliminacion_db.sql</FullPath>
+        </FileNode>
+        <FileNode Name="01_creacion_db_schemas.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>01_creacion_db_schemas.sql</FullPath>
+        </FileNode>
+        <FileNode Name="01_tablas_staging.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>01_tablas_staging.sql</FullPath>
+        </FileNode>
+        <FileNode Name="02_import_api_feriados.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>02_import_api_feriados.sql</FullPath>
+        </FileNode>
+        <FileNode Name="02_import_api_tipocambio.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>02_import_api_tipocambio.sql</FullPath>
+        </FileNode>
+        <FileNode Name="02_import_csv_visitas.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>02_import_csv_visitas.sql</FullPath>
+        </FileNode>
+        <FileNode Name="02_import_csv_visitas_anual.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>02_import_csv_visitas_anual.sql</FullPath>
+        </FileNode>
+        <FileNode Name="02_import_csv_visitas_region.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>02_import_csv_visitas_region.sql</FullPath>
+        </FileNode>
+        <FileNode Name="02_import_csv_wdpa.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>02_import_csv_wdpa.sql</FullPath>
+        </FileNode>
+        <FileNode Name="02_tablas_concesiones.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>02_tablas_concesiones.sql</FullPath>
+        </FileNode>
+        <FileNode Name="02_tablas_guias_tour_atracciones.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>02_tablas_guias_tour_atracciones.sql</FullPath>
+        </FileNode>
+        <FileNode Name="02_tablas_parque_guardaparque.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>02_tablas_parque_guardaparque.sql</FullPath>
+        </FileNode>
+        <FileNode Name="02_tablas_ventas.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>02_tablas_ventas.sql</FullPath>
+        </FileNode>
+        <FileNode Name="03_abm_concesiones.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>03_abm_concesiones.sql</FullPath>
+        </FileNode>
+        <FileNode Name="03_abm_guias_tour_atracciones.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>03_abm_guias_tour_atracciones.sql</FullPath>
+        </FileNode>
+        <FileNode Name="03_abm_parque_guardaparque.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>03_abm_parque_guardaparque.sql</FullPath>
+        </FileNode>
+        <FileNode Name="03_abm_ventas.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>03_abm_ventas.sql</FullPath>
+        </FileNode>
+        <FileNode Name="03_import_csv_areas_protegidas.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>03_import_csv_areas_protegidas.sql</FullPath>
+        </FileNode>
+        <FileNode Name="03_seed_ventas.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>03_seed_ventas.sql</FullPath>
+        </FileNode>
+        <FileNode Name="04_negocio_concesiones.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>04_negocio_concesiones.sql</FullPath>
+        </FileNode>
+        <FileNode Name="04_negocio_guias_tour_atracciones.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>04_negocio_guias_tour_atracciones.sql</FullPath>
+        </FileNode>
+        <FileNode Name="04_negocio_parque_guardaparque.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>04_negocio_parque_guardaparque.sql</FullPath>
+        </FileNode>
+        <FileNode Name="04_negocio_ventas.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>04_negocio_ventas.sql</FullPath>
+        </FileNode>
+        <FileNode Name="04_testing_importacion.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>04_testing_importacion.sql</FullPath>
+        </FileNode>
+        <FileNode Name="05_testing_abm_concesiones.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>05_testing_abm_concesiones.sql</FullPath>
+        </FileNode>
+        <FileNode Name="05_testing_abm_ventas.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>05_testing_abm_ventas.sql</FullPath>
+        </FileNode>
+        <FileNode Name="05_testing_guias_tour_atracciones.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>05_testing_guias_tour_atracciones.sql</FullPath>
+        </FileNode>
+        <FileNode Name="05_testing_negocio_concesiones.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>05_testing_negocio_concesiones.sql</FullPath>
+        </FileNode>
+        <FileNode Name="05_testing_negocio_parque_guardaparque.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>05_testing_negocio_parque_guardaparque.sql</FullPath>
+        </FileNode>
+        <FileNode Name="05_testing_negocio_ventas.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>05_testing_negocio_ventas.sql</FullPath>
+        </FileNode>
+        <FileNode Name="05_testing_parque_guardaparque.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>05_testing_parque_guardaparque.sql</FullPath>
+        </FileNode>
+        <FileNode Name="06_unificados_abm.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>06_unificados_abm.sql</FullPath>
+        </FileNode>
+        <FileNode Name="06_unificados_negocio.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>06_unificados_negocio.sql</FullPath>
+        </FileNode>
+        <FileNode Name="06_unificados_tablas.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>06_unificados_tablas.sql</FullPath>
+        </FileNode>
+        <FileNode Name="entrega5_testing.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>entrega5_testing.sql</FullPath>
+        </FileNode>
+        <FileNode Name="entrega5_unificado.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>entrega5_unificado.sql</FullPath>
+        </FileNode>
+        <FileNode Name="entrega6_importacion.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>entrega6_importacion.sql</FullPath>
+        </FileNode>
+        <FileNode Name="entrega6_testing.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>entrega6_testing.sql</FullPath>
+        </FileNode>
+        <FileNode Name="entrega6_unificado.sql">
+          <AssociatedConnectionMoniker />
+          <AssociatedConnSrvName />
+          <AssociatedConnUserName />
+          <FullPath>entrega6_unificado.sql</FullPath>
+        </FileNode>
+      </Items>
+    </LogicalFolder>
+    <LogicalFolder Name="Varios" Type="3" Sorted="true">
+      <Items />
+    </LogicalFolder>
+  </Items>
+</SqlWorkbenchSqlProject>
