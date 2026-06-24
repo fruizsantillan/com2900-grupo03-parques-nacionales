@@ -33,7 +33,6 @@ Motor de base de datos: **Microsoft SQL Server 2022**
 📁 com2900-grupo03-parques-nacionales/
    📄 .gitignore
    📄 README.md
-   📄 com2900-grupo03-parques-nacionales.slnx
    
    📁 Entrega3_DER/
       📄 db_diagram.txt
