@@ -765,7 +765,7 @@ BEGIN
 
         WHEN NOT MATCHED THEN
             INSERT (fecha, tipo, compra, venta)
-            VALUES (origen.fecha, origen.tipo, origen.compra, origen.venta)
+            VALUES (origen.fecha, origen.tipo, origen.compra, origen.venta);
 
         COMMIT TRANSACTION;
 
