@@ -13,7 +13,7 @@
 | Apellido y Nombre | GitHub |
 |---|---|
 | Del Vecchio, Fabrizio | fabrid022-cmyk |
-| Ocampos, Horacio | — |
+| Ocampos, Horacio | horacioocampos |
 | Ruiz Santillán, Facundo | fruizsantillan |
 | Lago, Franco Nehuen | LagooFran |
 
@@ -74,8 +74,8 @@ Motor de base de datos: **Microsoft SQL Server 2022**
 | Columnas | camelCase | `idParque`, `fechaInicio` |
 | Primary Key | `id` + NombreTabla | `idParque` |
 | Foreign Key | mismo nombre que la PK referenciada | `idParque` |
-| Stored Procedures ABM | `sp_Tabla_Accion` | `sp_Parque_Insertar` |
-| Stored Procedures negocio | `sp_DescripcionOperacion` | `sp_RegistrarVentaEntrada` |
+| Stored Procedures ABM | `Tabla_Accion` | `Parque_Insertar` |
+| Stored Procedures negocio | `DescripcionOperacion` | `RegistrarVentaEntrada` |
 | Parámetros SP | `@` + camelCase | `@idParque`, `@fechaInicio` |
 | Variables locales | `@v` + camelCase | `@vTotal`, `@vMensajeError` |
 | Vistas | `vw_` + PascalCase | `vw_ConcesionesVigentes` |
@@ -114,7 +114,7 @@ Todos los scripts deben comenzar con el siguiente comentario:
 | 2 | Investigación y costos Cloud | ✅ Entregado |
 | 3 | Diagrama de Entidad-Relación | ✅ Entregado |
 | 4 | Instalación y Configuración | ✅ Entregado |
-| 5 | Base de Datos | — |
+| 5 | Base de Datos | ✅ Entregado |
 | 6 | Procesos de Importación | — |
 | 7 | Reportes | — |
 | 8 | Seguridad y Respaldo | — |
