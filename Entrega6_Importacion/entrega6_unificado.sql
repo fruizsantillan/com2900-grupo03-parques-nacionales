@@ -701,7 +701,7 @@ BEGIN
     END
 
     EXEC @vHrResult = sp_OAGetProperty @vObjHttp, 'responseText', @vRespuesta OUT;
-    EXEC ´sp_OADestroy @vObjHttp;
+    EXEC sp_OADestroy @vObjHttp;
 
     IF @vRespuesta IS NULL OR LEN(@vRespuesta) < 5
     BEGIN
@@ -966,7 +966,7 @@ BEGIN
 
         WHEN NOT MATCHED THEN
             INSERT (fecha, tipo, compra, venta)
-            VALUES (origen.fecha, origen.tipo, origen.compra, origen.venta)
+            VALUES (origen.fecha, origen.tipo, origen.compra, origen.venta);
 
         COMMIT TRANSACTION;
 
