@@ -26,12 +26,38 @@ EXEC personal.Guia_Insertar
 SELECT * FROM personal.Guia WHERE dni = 30000001;
 
 PRINT '===== TEST 2 (OK): asignar guia a tour sin superposicion =====';
--- Resultado esperado: asignación creada correctamente
-EXEC personal.AsignacionGuia_Insertar
-    @idTour      = 1,
+PRINT '===== SETUP: carga de datos base =====';
+-- Declaramos variables para guardar los IDs reales que genere la base de datos
+DECLARE @vIdTipo INT, @vIdUbic INT, @vIdParque INT, @vIdTour INT;
+
+-- 1. Insertar un Tipo de Parque (solo si no existe) y guardar su ID
+IF NOT EXISTS (SELECT 1 FROM parques.TipoParque WHERE descripcion = 'Parque Nacional Test')
+    EXEC parques.TipoParque_Insertar @descripcion = 'Parque Nacional Test';
+SELECT @vIdTipo = idTipoParque FROM parques.TipoParque WHERE descripcion = 'Parque Nacional Test';
+
+-- 2. Insertar Ubicacion (solo si no existe) y guardar su ID
+IF NOT EXISTS (SELECT 1 FROM parques.Ubicacion WHERE direccion = 'Ruta Test 1')
+    EXEC parques.Ubicacion_Insertar @direccion = 'Ruta Test 1', @provincia = 'Misiones', @latitud = -25.0, @longitud = -54.0;
+SELECT @vIdUbic = idUbicacion FROM parques.Ubicacion WHERE direccion = 'Ruta Test 1';
+
+-- 3. Insertar el Parque usando las variables anteriores y guardar su ID
+IF NOT EXISTS (SELECT 1 FROM parques.Parque WHERE nombre = 'Iguazu Test')
+    EXEC parques.Parque_Insertar @nombre = 'Iguazu Test', @superficie = 1000, @idTipoParque = @vIdTipo, @idUbicacion = @vIdUbic;
+SELECT @vIdParque = idParque FROM parques.Parque WHERE nombre = 'Iguazu Test';
+
+-- 4. Insertar el Tour usando el ID del Parque y guardar su ID
+IF NOT EXISTS (SELECT 1 FROM actividades.Tour WHERE nombre = 'Tour Cataratas Test')
+    EXEC actividades.Tour_Insertar @nombre = 'Tour Cataratas Test', @duracion = 120, @cupoMaximo = 20, @precio = 5000, @idParque = @vIdParque;
+SELECT @vIdTour = idTour FROM actividades.Tour WHERE nombre = 'Tour Cataratas Test';
+
+
+-- Resultado esperado: asignación creada correctamente usando el ID del tour real (@vIdTour)
+EXEC personal.AsignacionGuia_Insertar    
+    @idTour      = @vIdTour,
     @dniGuia     = 30000001,
     @fechaInicio = '2025-01-01',
     @fechaFin    = '2025-06-30';
+
 SELECT * FROM personal.AsignacionGuia WHERE dniGuia = 30000001;
 
 PRINT '===== TEST 3 (OK): registrar atraccion valida =====';
