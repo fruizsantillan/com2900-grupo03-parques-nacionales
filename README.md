@@ -30,37 +30,82 @@ Motor de base de datos: **Microsoft SQL Server 2022**
 ## Estructura del Repositorio
 
 ```
-📁 Entregas/
-    📁 Entrega3_DER/
-    📁 Entrega4_Instalacion/
-    📁 Entrega5_BaseDeDatos/
-    📁 Entrega6_Importacion/
-    📁 Entrega7_Reportes/
-    📁 Entrega8_SeguridadRespaldo/
-    📁 Entrega9_Final/
+📁 com2900-grupo03-parques-nacionales/
+   📄 .gitignore
+   📄 README.md
+   📄 com2900-grupo03-parques-nacionales.slnx
+   
+   📁 Entrega3_DER/
+      📄 db_diagram.txt
+      📄 E3_Com2900.pdf
+      
+   📁 Entrega4_Instalacion/
+      📄 Com2900_Grupo03_E4.docx
+      
+   📁 Entrega5_BaseDeDatos/
+      📁 00_eliminacion_db/
+         📄 00_eliminacion_db.sql
+      📁 01_creacion_db/
+         📄 01_creacion_db_schemas.sql
+      📁 02_tablas/
+         📄 02_tablas_concesiones.sql
+         📄 02_tablas_guias_tour_atracciones.sql
+         📄 02_tablas_parque_guardaparque.sql
+         📄 02_tablas_ventas.sql
+      📁 03_abm/
+         📄 03_abm_concesiones.sql
+         📄 03_abm_guias_tour_atracciones.sql
+         📄 03_abm_parque_guardaparque.sql
+         📄 03_abm_ventas.sql
+      📁 04_logica_negocio/
+         📄 04_negocio_concesiones.sql
+         📄 04_negocio_guias_tour_atracciones.sql
+         📄 04_negocio_parque_guardaparque.sql
+         📄 04_negocio_ventas.sql
+      📁 05_testing/
+         📄 05_testing_abm_concesiones.sql
+         📄 05_testing_abm_ventas.sql
+         📄 05_testing_guias_tour_atracciones.sql
+         📄 05_testing_negocio_concesiones.sql
+         📄 05_testing_negocio_parque_guardaparque.sql
+         📄 05_testing_negocio_ventas.sql
+         📄 05_testing_parque_guardaparque.sql
+      📁 06_unificados/
+         📄 06_unificados_abm.sql
+         📄 06_unificados_negocio.sql
+         📄 06_unificados_tablas.sql
+         📄 entrega5_testing.sql
+         📄 entrega5_unificado.sql
 
-📁 Scripts/
-    📄 01_CreacionDB.sql           -- Creación de la base de datos y esquemas
-    📄 02_Tablas.sql               -- Creación de tablas y restricciones
-    📄 03_SP_ABM.sql               -- Stored Procedures de alta, baja y modificación
-    📄 04_SP_Negocio.sql           -- Stored Procedures de lógica de negocio
-    📄 05_Vistas.sql               -- Vistas del sistema
-    📄 06_Funciones.sql            -- Funciones escalares y de tabla
-    📄 07_Importacion.sql          -- Stored Procedures de importación de datos externos
-    📄 08_Reportes.sql             -- Stored Procedures de reportes
-    📄 09_Seguridad.sql            -- Roles, permisos y cifrado
-    📄 10_SeedData.sql             -- Datos de prueba (juego de datos mínimo)
-
-📁 Testing/
-    📄 TEST_SP_ABM.sql             -- Scripts de testing para SPs ABM
-    📄 TEST_SP_Negocio.sql         -- Scripts de testing para lógica de negocio
-    📄 TEST_Importacion.sql        -- Scripts de testing para importación
-
-📁 Documentacion/
-    📄 NormasNomenclatura.md       -- Norma de nomenclatura del grupo
-    📄 DER.png                  -- Diagrama Entidad-Relación
-
-📄 README.md
+   📁 Entrega6_Importacion/
+      📄 entrega6_importacion.sql
+      📄 entrega6_testing.sql
+      📄 entrega6_unificado.sql
+      📁 01_staging/
+         📄 01_tablas_staging.sql
+      📁 02_importacion/
+         📄 02_import_api_feriados.sql
+         📄 02_import_api_tipocambio.sql
+         📄 02_import_csv_visitas.sql
+         📄 02_import_csv_visitas_anual.sql
+         📄 02_import_csv_visitas_region.sql
+         📄 02_import_csv_wdpa.sql
+      📁 03_datos_iniciales/
+         📄 03_import_csv_areas_protegidas.sql
+         📄 03_seed_ventas.sql
+      📁 04_testing/
+         📄 04_testing_importacion.sql
+      📁 datasets/
+         📁 datos-gob-ar/
+            📄 aprn_h_ubicacion_superycatint_ha.csv
+            📄 aprn_i_visitas_porc_2024.csv
+            📄 parques_nac.pdf
+            📄 visitas-residentes-y-no-residentes-por-region.csv
+            📄 visitas-residentes-y-no-residentes.csv
+         📁 protected-planet/
+            📁 WDPA_WDOECM_Jun2026_Public_ARG_csv/
+               📄 WDPA_sources_Jun2026.csv
+               📄 WDPA_WDOECM_Jun2026_Public_ARG_csv.csv
 ```
 
 ---
