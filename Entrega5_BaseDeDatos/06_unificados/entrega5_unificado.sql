@@ -2829,10 +2829,10 @@ GO
 -- Descripcion: Stored Procedures de LOGICA DE NEGOCIO del modulo Parques.
 --              Operaciones que afectan varias tablas, encapsuladas en
 --              transacciones que garantizan la integridad de los datos.
---              SPs: sp_RegistrarParque             (Ubicacion + Parque)
---                   sp_RegistrarGuardaparque       (Guardaparque + 1er Asignacion)
---                   sp_ReasignarGuardaparque       (cierra asignacion + abre nueva)
---                   sp_RegistrarEgresoGuardaparque (cierra asignacion vigente)
+--              SPs: RegistrarParque             (Ubicacion + Parque)
+--                   RegistrarGuardaparque       (Guardaparque + 1er Asignacion)
+--                   ReasignarGuardaparque       (cierra asignacion + abre nueva)
+--                   RegistrarEgresoGuardaparque (cierra asignacion vigente)
 -- =============================================
 
 USE ParquesNacionales;
@@ -3137,10 +3137,10 @@ GO
 -- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
 -- Fecha: 15/06/2026
 -- Descripcion: Stored Procedures de logica de negocio - modulo Concesiones.
---   SP 1: sp_AltaConcesionCompleta
+--   SP 1: AltaConcesionCompleta
 --         Registra una nueva concesion validando integridad entre
 --         empresa, parque, tipo y solapamiento de vigencias.
---   SP 2: sp_RegistrarPagoCanon
+--   SP 2: RegistrarPagoCanon
 --         Registra el pago mensual del canon validando que la
 --         concesion este vigente y que no exista pago duplicado
 --         para el mismo periodo.
@@ -3150,7 +3150,7 @@ USE ParquesNacionales;
 GO
 
 -- ============================================================
--- SP: sp_AltaConcesionCompleta
+-- SP: AltaConcesionCompleta
 -- Logica de negocio: alta de concesion con validaciones cruzadas
 -- Validaciones:
 --   1. Descripcion obligatoria
@@ -3237,7 +3237,7 @@ END
 GO
 
 -- ============================================================
--- SP: sp_RegistrarPagoCanon
+-- SP: RegistrarPagoCanon
 -- Logica de negocio: pago mensual del canon de una concesion
 -- Validaciones:
 --   1. La concesion debe existir

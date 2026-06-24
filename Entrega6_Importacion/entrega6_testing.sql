@@ -33,18 +33,18 @@ PRINT '===========================================================';
 GO
 
 -- ============================================================
--- TEST 1: sp_ImportarVisitasNacionales
+-- TEST 1: ImportarVisitasNacionales
 -- Dataset: visitas-residentes-y-no-residentes.csv
 -- Esperado exitoso: ~1980 filas procesadas (660 filas x 3 tipos)
 -- ============================================================
 
 PRINT '';
-PRINT '=== TEST 1: sp_ImportarVisitasNacionales ===';
+PRINT '=== TEST 1: ImportarVisitasNacionales ===';
 
 -- [EXITOSO] Primera importacion
 PRINT '-- Caso exitoso: primera importacion del CSV';
 -- RESULTADO ESPERADO: Filas insertadas ~660 (una por periodo/tipo)
-EXEC parques.sp_ImportarVisitasNacionales
+EXEC parques.ImportarVisitasNacionales
     @vRutaArchivo = 'C:\TP_ParquesNacionales\Entrega6_Importacion\datasets\datos-gob-ar\visitas-residentes-y-no-residentes.csv';
 
 -- Evidencia: muestra primeras y ultimas filas importadas
@@ -77,7 +77,7 @@ PRINT '-- Caso Upsert: reimportacion del mismo archivo (no debe duplicar registr
 -- RESULTADO ESPERADO: 0 insertadas, misma cantidad actualizada o sin cambios
 DECLARE @vConteoAntes INT = (SELECT COUNT(*) FROM parques.EstadisticaVisitas);
 
-EXEC parques.sp_ImportarVisitasNacionales
+EXEC parques.ImportarVisitasNacionales
     @vRutaArchivo = 'C:\TP_ParquesNacionales\Entrega6_Importacion\datasets\datos-gob-ar\visitas-residentes-y-no-residentes.csv';
 
 DECLARE @vConteoDespues INT = (SELECT COUNT(*) FROM parques.EstadisticaVisitas);
@@ -93,7 +93,7 @@ ELSE
 PRINT '-- Fallo esperado: archivo no encontrado';
 -- RESULTADO ESPERADO: error de BULK INSERT (archivo no existe)
 BEGIN TRY
-    EXEC parques.sp_ImportarVisitasNacionales
+    EXEC parques.ImportarVisitasNacionales
         @vRutaArchivo = 'C:\ruta\inexistente\archivo.csv';
 END TRY
 BEGIN CATCH
@@ -102,18 +102,18 @@ END CATCH
 GO
 
 -- ============================================================
--- TEST 2: sp_ImportarVisitasPorRegion
+-- TEST 2: ImportarVisitasPorRegion
 -- Dataset: visitas-residentes-y-no-residentes-por-region.csv
 -- Esperado exitoso: ~3960 filas (regiones x periodos x tipos)
 -- ============================================================
 
 PRINT '';
-PRINT '=== TEST 2: sp_ImportarVisitasPorRegion ===';
+PRINT '=== TEST 2: ImportarVisitasPorRegion ===';
 
 -- [EXITOSO]
 PRINT '-- Caso exitoso: importacion CSV por region';
 -- RESULTADO ESPERADO: ~3960 registros, 6 regiones distintas
-EXEC parques.sp_ImportarVisitasPorRegion
+EXEC parques.ImportarVisitasPorRegion
     @vRutaArchivo = 'C:\TP_ParquesNacionales\Entrega6_Importacion\datasets\datos-gob-ar\visitas-residentes-y-no-residentes-por-region.csv';
 
 -- Evidencia: resumen por region
@@ -132,7 +132,7 @@ ORDER BY totalVisitas DESC;
 PRINT '-- Caso Upsert: reimportacion (no debe duplicar)';
 -- RESULTADO ESPERADO: conteo identico antes y despues
 DECLARE @vConteoAntes2 INT = (SELECT COUNT(*) FROM parques.EstadisticaVisitasPorRegion);
-EXEC parques.sp_ImportarVisitasPorRegion
+EXEC parques.ImportarVisitasPorRegion
     @vRutaArchivo = 'C:\TP_ParquesNacionales\Entrega6_Importacion\datasets\datos-gob-ar\visitas-residentes-y-no-residentes-por-region.csv';
 DECLARE @vConteoDespues2 INT = (SELECT COUNT(*) FROM parques.EstadisticaVisitasPorRegion);
 IF @vConteoAntes2 = @vConteoDespues2
@@ -142,18 +142,18 @@ ELSE
 GO
 
 -- ============================================================
--- TEST 3: sp_ImportarVisitasAnual
+-- TEST 3: ImportarVisitasAnual
 -- Dataset: aprn_i_visitas_porc_2024.csv
 -- Esperado exitoso: 18 registros (2008-2025)
 -- ============================================================
 
 PRINT '';
-PRINT '=== TEST 3: sp_ImportarVisitasAnual ===';
+PRINT '=== TEST 3: ImportarVisitasAnual ===';
 
 -- [EXITOSO]
 PRINT '-- Caso exitoso: importacion CSV porcentajes anuales';
 -- RESULTADO ESPERADO: 18 filas, anios 2008 a 2025
-EXEC parques.sp_ImportarVisitasAnual
+EXEC parques.ImportarVisitasAnual
     @vRutaArchivo = 'C:\TP_ParquesNacionales\Entrega6_Importacion\datasets\datos-gob-ar\aprn_i_visitas_porc_2024.csv';
 
 -- Evidencia
@@ -183,18 +183,18 @@ WHERE anio = 2021;
 GO
 
 -- ============================================================
--- TEST 4: sp_ImportarAreasProtegidas
+-- TEST 4: ImportarAreasProtegidas
 -- Dataset: aprn_h_ubicacion_superycatint_ha.csv (APN, sep ;)
 -- Esperado exitoso: ~48 areas protegidas
 -- ============================================================
 
 PRINT '';
-PRINT '=== TEST 4: sp_ImportarAreasProtegidas ===';
+PRINT '=== TEST 4: ImportarAreasProtegidas ===';
 
 -- [EXITOSO]
 PRINT '-- Caso exitoso: importacion CSV APN (separador ;)';
 -- RESULTADO ESPERADO: tipos de parque creados, parques insertados con superficie en ha
-EXEC parques.sp_ImportarAreasProtegidas
+EXEC parques.ImportarAreasProtegidas
     @vRutaArchivo = 'C:\TP_ParquesNacionales\Entrega6_Importacion\datasets\datos-gob-ar\aprn_h_ubicacion_superycatint_ha.csv';
 
 -- Evidencia: tipos de parque generados
@@ -217,7 +217,7 @@ ORDER BY p.superficie DESC;
 PRINT '-- Caso Upsert: reimportacion APN (no debe duplicar)';
 -- RESULTADO ESPERADO: Parques actualizados = 0 o los mismos, Insertados = 0
 DECLARE @vConteoAntes4 INT = (SELECT COUNT(*) FROM parques.Parque);
-EXEC parques.sp_ImportarAreasProtegidas
+EXEC parques.ImportarAreasProtegidas
     @vRutaArchivo = 'C:\TP_ParquesNacionales\Entrega6_Importacion\datasets\datos-gob-ar\aprn_h_ubicacion_superycatint_ha.csv';
 DECLARE @vConteoDespues4 INT = (SELECT COUNT(*) FROM parques.Parque);
 IF @vConteoAntes4 = @vConteoDespues4
@@ -227,20 +227,20 @@ ELSE
 GO
 
 -- ============================================================
--- TEST 5: sp_ImportarAreasWDPA
+-- TEST 5: ImportarAreasWDPA
 -- Dataset: WDPA_WDOECM_Jun2026_Public_ARG_csv.csv (Protected Planet)
 -- Esperado exitoso: ~479 filas en staging, filtra solo nacionales
 -- ============================================================
 
 PRINT '';
-PRINT '=== TEST 5: sp_ImportarAreasWDPA ===';
+PRINT '=== TEST 5: ImportarAreasWDPA ===';
 
 -- [EXITOSO]
 PRINT '-- Caso exitoso: importacion CSV WDPA Protected Planet';
 -- RESULTADO ESPERADO: carga ~479 en staging, procesa solo las de jurisdiccion Nacional
 -- Parques ya existentes (del TEST 4) tendran superficie actualizada con GIS_AREA en km2*100
 -- Nuevas areas protegidas no nacionales seran descartadas e informadas
-EXEC parques.sp_ImportarAreasWDPA
+EXEC parques.ImportarAreasWDPA
     @vRutaArchivo = 'C:\TP_ParquesNacionales\Entrega6_Importacion\datasets\protected-planet\WDPA_WDOECM_Jun2026_Public_ARG_csv\WDPA_WDOECM_Jun2026_Public_ARG_csv.csv';
 
 -- Evidencia: distribucion por tipo de area en staging (todas las jurisdicciones)
@@ -278,7 +278,7 @@ PRINT '-- Verificacion importacion parcial: filas con gisArea invalido son desca
 PRINT '-- Caso Upsert: reimportacion WDPA (no debe duplicar parques)';
 -- RESULTADO ESPERADO: solo actualizaciones o sin cambios, nunca duplicados
 DECLARE @vConteoAntes5 INT = (SELECT COUNT(*) FROM parques.Parque);
-EXEC parques.sp_ImportarAreasWDPA
+EXEC parques.ImportarAreasWDPA
     @vRutaArchivo = 'C:\TP_ParquesNacionales\Entrega6_Importacion\datasets\protected-planet\WDPA_WDOECM_Jun2026_Public_ARG_csv\WDPA_WDOECM_Jun2026_Public_ARG_csv.csv';
 DECLARE @vConteoDespues5 INT = (SELECT COUNT(*) FROM parques.Parque);
 IF @vConteoAntes5 = @vConteoDespues5
@@ -288,18 +288,18 @@ ELSE
 GO
 
 -- ============================================================
--- TEST 6: sp_ImportarFeriados (API JSON - ArgentinaDatos)
+-- TEST 6: ImportarFeriados (API JSON - ArgentinaDatos)
 -- RESULTADO ESPERADO: feriados del anio importados desde la API
 -- REQUISITO: Ole Automation habilitado, conectividad a internet
 -- ============================================================
 
 PRINT '';
-PRINT '=== TEST 6: sp_ImportarFeriados (API JSON) ===';
+PRINT '=== TEST 6: ImportarFeriados (API JSON) ===';
 
 -- [EXITOSO] Importar feriados de anio vigente
 PRINT '-- Caso exitoso: importar feriados 2026';
 -- RESULTADO ESPERADO: feriados nacionales del 2026 insertados en parques.Feriado
-EXEC parques.sp_ImportarFeriados @vAnio = 2026;
+EXEC parques.ImportarFeriados @vAnio = 2026;
 
 -- Evidencia
 SELECT
@@ -316,7 +316,7 @@ WHERE YEAR(fecha) = 2026;
 
 -- [EXITOSO] Importar otro anio
 PRINT '-- Caso exitoso: importar feriados 2025';
-EXEC parques.sp_ImportarFeriados @vAnio = 2025;
+EXEC parques.ImportarFeriados @vAnio = 2025;
 
 SELECT COUNT(*) AS totalFeriados2025
 FROM parques.Feriado
@@ -326,7 +326,7 @@ WHERE YEAR(fecha) = 2025;
 PRINT '-- Caso Upsert: reimportacion feriados 2026 (no debe duplicar)';
 -- RESULTADO ESPERADO: misma cantidad de feriados antes y despues
 DECLARE @vConteoFeriados INT = (SELECT COUNT(*) FROM parques.Feriado WHERE YEAR(fecha) = 2026);
-EXEC parques.sp_ImportarFeriados @vAnio = 2026;
+EXEC parques.ImportarFeriados @vAnio = 2026;
 DECLARE @vConteoFeriadosDespues INT = (SELECT COUNT(*) FROM parques.Feriado WHERE YEAR(fecha) = 2026);
 IF @vConteoFeriados = @vConteoFeriadosDespues
     PRINT 'UPSERT OK: sin duplicados. Feriados 2026: ' + CAST(@vConteoFeriadosDespues AS VARCHAR);
@@ -337,14 +337,14 @@ ELSE
 PRINT '-- Fallo esperado: anio fuera de rango';
 -- RESULTADO ESPERADO: RAISERROR con mensaje de validacion
 BEGIN TRY
-    EXEC parques.sp_ImportarFeriados @vAnio = 1900;
+    EXEC parques.ImportarFeriados @vAnio = 1900;
 END TRY
 BEGIN CATCH
     PRINT 'ERROR capturado (esperado): ' + ERROR_MESSAGE();
 END CATCH
 
 BEGIN TRY
-    EXEC parques.sp_ImportarFeriados @vAnio = 2200;
+    EXEC parques.ImportarFeriados @vAnio = 2200;
 END TRY
 BEGIN CATCH
     PRINT 'ERROR capturado (esperado): ' + ERROR_MESSAGE();
@@ -352,26 +352,26 @@ END CATCH
 GO
 
 -- ============================================================
--- TEST 7: sp_ImportarTipoCambio (API JSON - dolarapi.com)
+-- TEST 7: ImportarTipoCambio (API JSON - dolarapi.com)
 -- RESULTADO ESPERADO: tipo de cambio del dia registrado
 -- REQUISITO: Ole Automation habilitado, conectividad a internet
 -- ============================================================
 
 PRINT '';
-PRINT '=== TEST 7: sp_ImportarTipoCambio (API JSON) ===';
+PRINT '=== TEST 7: ImportarTipoCambio (API JSON) ===';
 
 -- [EXITOSO] Importar dolar oficial
 PRINT '-- Caso exitoso: importar tipo de cambio oficial';
 -- RESULTADO ESPERADO: compra y venta del dolar oficial registradas para hoy
-EXEC parques.sp_ImportarTipoCambio @vTipo = 'oficial';
+EXEC parques.ImportarTipoCambio @vTipo = 'oficial';
 
 -- [EXITOSO] Importar dolar blue
 PRINT '-- Caso exitoso: importar tipo de cambio blue';
-EXEC parques.sp_ImportarTipoCambio @vTipo = 'blue';
+EXEC parques.ImportarTipoCambio @vTipo = 'blue';
 
 -- [EXITOSO] Importar dolar tarjeta (relevante para visitantes extranjeros)
 PRINT '-- Caso exitoso: importar tipo de cambio tarjeta';
-EXEC parques.sp_ImportarTipoCambio @vTipo = 'tarjeta';
+EXEC parques.ImportarTipoCambio @vTipo = 'tarjeta';
 
 -- Evidencia: tipos de cambio del dia
 SELECT
@@ -388,7 +388,7 @@ ORDER BY tipo;
 PRINT '-- Caso Upsert: reimportacion del mismo tipo y fecha (actualiza, no duplica)';
 -- RESULTADO ESPERADO: misma cantidad de registros, valores actualizados
 DECLARE @vConteoTC INT = (SELECT COUNT(*) FROM parques.TipoCambio WHERE fecha = CAST(GETDATE() AS DATE));
-EXEC parques.sp_ImportarTipoCambio @vTipo = 'oficial';
+EXEC parques.ImportarTipoCambio @vTipo = 'oficial';
 DECLARE @vConteoTCDespues INT = (SELECT COUNT(*) FROM parques.TipoCambio WHERE fecha = CAST(GETDATE() AS DATE));
 IF @vConteoTC = @vConteoTCDespues
     PRINT 'UPSERT OK: sin duplicados.';
@@ -399,7 +399,7 @@ ELSE
 PRINT '-- Fallo esperado: tipo de cambio invalido';
 -- RESULTADO ESPERADO: RAISERROR con lista de tipos validos
 BEGIN TRY
-    EXEC parques.sp_ImportarTipoCambio @vTipo = 'dolarito';
+    EXEC parques.ImportarTipoCambio @vTipo = 'dolarito';
 END TRY
 BEGIN CATCH
     PRINT 'ERROR capturado (esperado): ' + ERROR_MESSAGE();
@@ -407,12 +407,12 @@ END CATCH
 GO
 
 -- ============================================================
--- TEST 8: sp_ObtenerTipoCambioVigente
+-- TEST 8: ObtenerTipoCambioVigente
 -- Verifica el SP auxiliar que retorna el tipo de cambio mas reciente
 -- ============================================================
 
 PRINT '';
-PRINT '=== TEST 8: sp_ObtenerTipoCambioVigente ===';
+PRINT '=== TEST 8: ObtenerTipoCambioVigente ===';
 
 -- [EXITOSO] Obtener tipo de cambio vigente para conversion de precios
 PRINT '-- Caso exitoso: obtener tipo de cambio oficial vigente';
@@ -420,7 +420,7 @@ PRINT '-- Caso exitoso: obtener tipo de cambio oficial vigente';
 DECLARE @vVenta  DECIMAL(10,2);
 DECLARE @vCompra DECIMAL(10,2);
 
-EXEC parques.sp_ObtenerTipoCambioVigente
+EXEC parques.ObtenerTipoCambioVigente
     @vTipo   = 'oficial',
     @vVenta  = @vVenta  OUTPUT,
     @vCompra = @vCompra OUTPUT;
@@ -436,10 +436,10 @@ PRINT 'Precio entrada $' + CAST(@vPrecioARS AS VARCHAR)
 
 -- [FALLIDO] Tipo sin datos registrados
 PRINT '-- Fallo esperado: tipo sin cotizacion registrada';
--- RESULTADO ESPERADO: RAISERROR indicando que debe ejecutarse sp_ImportarTipoCambio
+-- RESULTADO ESPERADO: RAISERROR indicando que debe ejecutarse ImportarTipoCambio
 BEGIN TRY
     DECLARE @vV2 DECIMAL(10,2), @vC2 DECIMAL(10,2);
-    EXEC parques.sp_ObtenerTipoCambioVigente
+    EXEC parques.ObtenerTipoCambioVigente
         @vTipo   = 'cripto',
         @vVenta  = @vV2  OUTPUT,
         @vCompra = @vC2 OUTPUT;

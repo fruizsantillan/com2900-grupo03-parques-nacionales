@@ -29,7 +29,7 @@
 USE ParquesNacionales;
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_ImportarVisitasNacionales
+CREATE OR ALTER PROCEDURE parques.ImportarVisitasNacionales
     @vRutaArchivo NVARCHAR(500)
 AS
 BEGIN
@@ -63,7 +63,7 @@ BEGIN
             TABLOCK
         );
     ';
-    EXEC sp_executesql @vSql;
+    EXEC executesql @vSql;
 
     SELECT @vFilas = COUNT(*) FROM #VisitasNacionales;
     PRINT 'Filas cargadas en staging temporal: ' + CAST(@vFilas AS VARCHAR);
@@ -127,7 +127,7 @@ BEGIN
         ROLLBACK TRANSACTION;
         IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL DROP TABLE #vMergeOutput;
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-        VALUES ('parques.sp_ImportarVisitasNacionales', @vRutaArchivo, ISNULL(@vFilas,0), 0, 0, 1);
+        VALUES ('parques.ImportarVisitasNacionales', @vRutaArchivo, ISNULL(@vFilas,0), 0, 0, 1);
         THROW;
     END CATCH;
 
@@ -135,17 +135,17 @@ BEGIN
     -- Paso 4: Log de importacion
     -- --------------------------------------------------------
     INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-    VALUES ('parques.sp_ImportarVisitasNacionales', @vRutaArchivo, @vFilas,
+    VALUES ('parques.ImportarVisitasNacionales', @vRutaArchivo, @vFilas,
             ISNULL(@vInsertadas,0), ISNULL(@vActualizadas,0), 0);
 END
 GO
 
 -- ============================================================
 -- NOTA DE USO:
--- EXEC parques.sp_ImportarVisitasNacionales
+-- EXEC parques.ImportarVisitasNacionales
 --     @vRutaArchivo = 'C:\TP_ParquesNacionales\datasets\visitas-residentes-y-no-residentes.csv';
 -- ============================================================
-PRINT 'SP parques.sp_ImportarVisitasNacionales creado correctamente.';
+PRINT 'SP parques.ImportarVisitasNacionales creado correctamente.';
 GO
 
 -- =============================================
@@ -167,7 +167,7 @@ GO
 USE ParquesNacionales;
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_ImportarVisitasPorRegion
+CREATE OR ALTER PROCEDURE parques.ImportarVisitasPorRegion
     @vRutaArchivo NVARCHAR(500)
 AS
 BEGIN
@@ -202,7 +202,7 @@ BEGIN
             TABLOCK
         );
     ';
-    EXEC sp_executesql @vSql;
+    EXEC executesql @vSql;
 
     SELECT @vFilas = COUNT(*) FROM #VisitasPorRegion;
     PRINT 'Filas cargadas en staging temporal: ' + CAST(@vFilas AS VARCHAR);
@@ -270,22 +270,22 @@ BEGIN
         ROLLBACK TRANSACTION;
         IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL DROP TABLE #vMergeOutput;
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-        VALUES ('parques.sp_ImportarVisitasPorRegion', @vRutaArchivo, ISNULL(@vFilas,0), 0, 0, 1);
+        VALUES ('parques.ImportarVisitasPorRegion', @vRutaArchivo, ISNULL(@vFilas,0), 0, 0, 1);
         THROW;
     END CATCH;
 
     INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-    VALUES ('parques.sp_ImportarVisitasPorRegion', @vRutaArchivo, @vFilas,
+    VALUES ('parques.ImportarVisitasPorRegion', @vRutaArchivo, @vFilas,
             ISNULL(@vInsertadas,0), ISNULL(@vActualizadas,0), 0);
 END
 GO
 
 -- ============================================================
 -- NOTA DE USO:
--- EXEC parques.sp_ImportarVisitasPorRegion
+-- EXEC parques.ImportarVisitasPorRegion
 --     @vRutaArchivo = 'C:\TP_ParquesNacionales\datasets\visitas-residentes-y-no-residentes-por-region.csv';
 -- ============================================================
-PRINT 'SP parques.sp_ImportarVisitasPorRegion creado correctamente.';
+PRINT 'SP parques.ImportarVisitasPorRegion creado correctamente.';
 GO
 
 -- =============================================
@@ -307,7 +307,7 @@ GO
 USE ParquesNacionales;
 GO
 
-CREATE OR ALTER PROCEDURE parques.sp_ImportarVisitasAnual
+CREATE OR ALTER PROCEDURE parques.ImportarVisitasAnual
     @vRutaArchivo NVARCHAR(500)
 AS
 BEGIN
@@ -341,7 +341,7 @@ BEGIN
             TABLOCK
         );
     ';
-    EXEC sp_executesql @vSql;
+    EXEC executesql @vSql;
 
     SELECT @vFilas = COUNT(*) FROM #VisitasPorcentajeAnual;
     PRINT 'Filas cargadas en staging temporal: ' + CAST(@vFilas AS VARCHAR);
@@ -398,22 +398,22 @@ BEGIN
         ROLLBACK TRANSACTION;
         IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL DROP TABLE #vMergeOutput;
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-        VALUES ('parques.sp_ImportarVisitasAnual', @vRutaArchivo, ISNULL(@vFilas,0), 0, 0, 1);
+        VALUES ('parques.ImportarVisitasAnual', @vRutaArchivo, ISNULL(@vFilas,0), 0, 0, 1);
         THROW;
     END CATCH;
 
     INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-    VALUES ('parques.sp_ImportarVisitasAnual', @vRutaArchivo, @vFilas,
+    VALUES ('parques.ImportarVisitasAnual', @vRutaArchivo, @vFilas,
             ISNULL(@vInsertadas,0), ISNULL(@vActualizadas,0), 0);
 END
 GO
 
 -- ============================================================
 -- NOTA DE USO:
--- EXEC parques.sp_ImportarVisitasAnual
+-- EXEC parques.ImportarVisitasAnual
 --     @vRutaArchivo = 'C:\TP_ParquesNacionales\datasets\aprn_i_visitas_porc_2024.csv';
 -- ============================================================
-PRINT 'SP parques.sp_ImportarVisitasAnual creado correctamente.';
+PRINT 'SP parques.ImportarVisitasAnual creado correctamente.';
 GO
 
 -- =============================================
@@ -427,11 +427,11 @@ GO
 --   Formato: JSON - segundo formato de datos del modulo de importacion
 --   Respuesta JSON (array): [{"fecha":"YYYY-MM-DD","tipo":"...","nombre":"..."}]
 --   Tipos conocidos: inamovible, trasladable, puente, nolaborable
---   Estrategia: sp_OACreate (OLE Automation) para HTTP GET ->
+--   Estrategia: OACreate (OLE Automation) para HTTP GET ->
 --               OPENJSON -> tabla temporal #Feriados -> UPSERT en parques.Feriado
 --
 --   REQUISITO PREVIO en SQL Server:
---     EXEC sp_configure 'Ole Automation Procedures', 1;
+--     EXEC configure 'Ole Automation Procedures', 1;
 --     RECONFIGURE;
 --   (requiere permisos de sysadmin)
 --
@@ -442,12 +442,12 @@ USE ParquesNacionales;
 GO
 
 -- ============================================================
--- SP: sp_ImportarFeriados
+-- SP: ImportarFeriados
 -- Llama a la API de ArgentinaDatos para un año dado,
 -- parsea el JSON recibido y hace UPSERT en parques.Feriado.
 -- Parametro: @vAnio = año a importar (ej. 2025)
 -- ============================================================
-CREATE OR ALTER PROCEDURE parques.sp_ImportarFeriados
+CREATE OR ALTER PROCEDURE parques.ImportarFeriados
     @vAnio INT
 AS
 BEGIN
@@ -473,43 +473,43 @@ BEGIN
     -- --------------------------------------------------------
     -- Paso 1: Llamada HTTP GET via OLE Automation
     -- --------------------------------------------------------
-    EXEC @vHrResult = sp_OACreate 'MSXML2.ServerXMLHTTP', @vObjHttp OUT;
+    EXEC @vHrResult = OACreate 'MSXML2.ServerXMLHTTP', @vObjHttp OUT;
     IF @vHrResult <> 0
     BEGIN
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-        VALUES ('parques.sp_ImportarFeriados', @vUrl, 0, 0, 0, 1);
-        RAISERROR('- Error al crear objeto HTTP (sp_OACreate). Verificar que Ole Automation este habilitado.', 16, 1);
+        VALUES ('parques.ImportarFeriados', @vUrl, 0, 0, 0, 1);
+        RAISERROR('- Error al crear objeto HTTP (OACreate). Verificar que Ole Automation este habilitado.', 16, 1);
         RETURN;
     END
 
-    EXEC @vHrResult = sp_OAMethod @vObjHttp, 'open', NULL, 'GET', @vUrl, false;
+    EXEC @vHrResult = OAMethod @vObjHttp, 'open', NULL, 'GET', @vUrl, false;
     IF @vHrResult <> 0
     BEGIN
-        EXEC sp_OADestroy @vObjHttp;
+        EXEC OADestroy @vObjHttp;
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-        VALUES ('parques.sp_ImportarFeriados', @vUrl, 0, 0, 0, 1);
+        VALUES ('parques.ImportarFeriados', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al abrir conexion HTTP.', 16, 1);
         RETURN;
     END
 
-    EXEC @vHrResult = sp_OAMethod @vObjHttp, 'setRequestHeader', NULL, 'Accept', 'application/json';
-    EXEC @vHrResult = sp_OAMethod @vObjHttp, 'send';
+    EXEC @vHrResult = OAMethod @vObjHttp, 'setRequestHeader', NULL, 'Accept', 'application/json';
+    EXEC @vHrResult = OAMethod @vObjHttp, 'send';
     IF @vHrResult <> 0
     BEGIN
-        EXEC sp_OADestroy @vObjHttp;
+        EXEC OADestroy @vObjHttp;
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-        VALUES ('parques.sp_ImportarFeriados', @vUrl, 0, 0, 0, 1);
+        VALUES ('parques.ImportarFeriados', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al enviar peticion HTTP.', 16, 1);
         RETURN;
     END
 
-    EXEC @vHrResult = sp_OAGetProperty @vObjHttp, 'responseText', @vRespuesta OUT;
-    EXEC sp_OADestroy @vObjHttp;
+    EXEC @vHrResult = OAGetProperty @vObjHttp, 'responseText', @vRespuesta OUT;
+    EXEC OADestroy @vObjHttp;
 
     IF @vRespuesta IS NULL OR LEN(@vRespuesta) < 5
     BEGIN
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-        VALUES ('parques.sp_ImportarFeriados', @vUrl, 0, 0, 0, 1);
+        VALUES ('parques.ImportarFeriados', @vUrl, 0, 0, 0, 1);
         RAISERROR('- La API no devolvio datos. Verificar conectividad o el anio consultado.', 16, 1);
         RETURN;
     END
@@ -585,12 +585,12 @@ BEGIN
         ROLLBACK TRANSACTION;
         IF OBJECT_ID('tempdb..#vMergeOutput') IS NOT NULL DROP TABLE #vMergeOutput;
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-        VALUES ('parques.sp_ImportarFeriados', @vUrl, ISNULL(@vFilas,0), 0, 0, 1);
+        VALUES ('parques.ImportarFeriados', @vUrl, ISNULL(@vFilas,0), 0, 0, 1);
         THROW;
     END CATCH;
 
     INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-    VALUES ('parques.sp_ImportarFeriados', @vUrl, @vFilas,
+    VALUES ('parques.ImportarFeriados', @vUrl, @vFilas,
             ISNULL(@vInsertadas,0), ISNULL(@vActualizadas,0), 0);
 END
 GO
@@ -598,17 +598,17 @@ GO
 -- ============================================================
 -- NOTA DE USO:
 -- Habilitar OLE Automation en SQL Server (una sola vez, requiere sysadmin):
---   EXEC sp_configure 'Ole Automation Procedures', 1;
+--   EXEC configure 'Ole Automation Procedures', 1;
 --   RECONFIGURE;
 --
 -- Importar feriados de un año:
---   EXEC parques.sp_ImportarFeriados @vAnio = 2025;
---   EXEC parques.sp_ImportarFeriados @vAnio = 2026;
+--   EXEC parques.ImportarFeriados @vAnio = 2025;
+--   EXEC parques.ImportarFeriados @vAnio = 2026;
 --
 -- Verificar resultado:
 --   SELECT * FROM parques.Feriado ORDER BY fecha;
 -- ============================================================
-PRINT 'SP parques.sp_ImportarFeriados creado correctamente.';
+PRINT 'SP parques.ImportarFeriados creado correctamente.';
 GO
 
 -- =============================================
@@ -628,10 +628,10 @@ GO
 --                             "fechaActualizacion":"2026-06-15T12:00:00.000Z"}
 --   Uso en el sistema: calcular el valor de entradas en dolares (Entrega 7,
 --   Reporte 2 - Ingresos en moneda extranjera).
---   Estrategia: sp_OACreate (HTTP GET) -> OPENJSON -> UPSERT en parques.TipoCambio
+--   Estrategia: OACreate (HTTP GET) -> OPENJSON -> UPSERT en parques.TipoCambio
 --
 --   REQUISITO PREVIO en SQL Server:
---     EXEC sp_configure 'Ole Automation Procedures', 1;
+--     EXEC configure 'Ole Automation Procedures', 1;
 --     RECONFIGURE;
 --
 -- Prerequisito: Ejecutar 01_tablas_staging.sql
@@ -641,13 +641,13 @@ USE ParquesNacionales;
 GO
 
 -- ============================================================
--- SP: sp_ImportarTipoCambio
+-- SP: ImportarTipoCambio
 -- Consulta la API dolarapi.com para el tipo indicado y guarda
 -- el valor en parques.TipoCambio con logica de Upsert.
 -- Parametro: @vTipo = 'oficial' | 'blue' | 'tarjeta'
 --            (default: 'oficial')
 -- ============================================================
-CREATE OR ALTER PROCEDURE parques.sp_ImportarTipoCambio
+CREATE OR ALTER PROCEDURE parques.ImportarTipoCambio
     @vTipo VARCHAR(20) = 'oficial'
 AS
 BEGIN
@@ -673,43 +673,43 @@ BEGIN
     -- --------------------------------------------------------
     -- Paso 1: HTTP GET via OLE Automation
     -- --------------------------------------------------------
-    EXEC @vHrResult = sp_OACreate 'MSXML2.ServerXMLHTTP', @vObjHttp OUT;
+    EXEC @vHrResult = OACreate 'MSXML2.ServerXMLHTTP', @vObjHttp OUT;
     IF @vHrResult <> 0
     BEGIN
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
+        VALUES ('parques.ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al crear objeto HTTP. Verificar que Ole Automation este habilitado.', 16, 1);
         RETURN;
     END
 
-    EXEC @vHrResult = sp_OAMethod @vObjHttp, 'open', NULL, 'GET', @vUrl, false;
+    EXEC @vHrResult = OAMethod @vObjHttp, 'open', NULL, 'GET', @vUrl, false;
     IF @vHrResult <> 0
     BEGIN
-        EXEC sp_OADestroy @vObjHttp;
+        EXEC OADestroy @vObjHttp;
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
+        VALUES ('parques.ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al abrir conexion HTTP con dolarapi.com.', 16, 1);
         RETURN;
     END
 
-    EXEC sp_OAMethod @vObjHttp, 'setRequestHeader', NULL, 'Accept', 'application/json';
-    EXEC @vHrResult = sp_OAMethod @vObjHttp, 'send';
+    EXEC OAMethod @vObjHttp, 'setRequestHeader', NULL, 'Accept', 'application/json';
+    EXEC @vHrResult = OAMethod @vObjHttp, 'send';
     IF @vHrResult <> 0
     BEGIN
-        EXEC sp_OADestroy @vObjHttp;
+        EXEC OADestroy @vObjHttp;
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
+        VALUES ('parques.ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Error al enviar peticion HTTP.', 16, 1);
         RETURN;
     END
 
-    EXEC sp_OAGetProperty @vObjHttp, 'responseText', @vRespuesta OUT;
-    EXEC sp_OADestroy @vObjHttp;
+    EXEC OAGetProperty @vObjHttp, 'responseText', @vRespuesta OUT;
+    EXEC OADestroy @vObjHttp;
 
     IF @vRespuesta IS NULL OR LEN(@vRespuesta) < 10
     BEGIN
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
+        VALUES ('parques.ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- La API no devolvio datos. Verificar conectividad a dolarapi.com.', 16, 1);
         RETURN;
     END
@@ -726,7 +726,7 @@ BEGIN
     IF @vCompra IS NULL OR @vVenta IS NULL
     BEGIN
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
+        VALUES ('parques.ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- No se pudieron parsear los valores de compra/venta del JSON.', 16, 1);
         RETURN;
     END
@@ -734,7 +734,7 @@ BEGIN
     IF @vCompra <= 0 OR @vVenta < @vCompra
     BEGIN
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
+        VALUES ('parques.ImportarTipoCambio', @vUrl, 0, 0, 0, 1);
         RAISERROR('- Valores de tipo de cambio invalidos recibidos de la API.', 16, 1);
         RETURN;
     END
@@ -781,23 +781,23 @@ BEGIN
     BEGIN CATCH
         ROLLBACK TRANSACTION;
         INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-        VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 1, 0, 0, 1);
+        VALUES ('parques.ImportarTipoCambio', @vUrl, 1, 0, 0, 1);
         THROW;
     END CATCH;
 
     INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-    VALUES ('parques.sp_ImportarTipoCambio', @vUrl, 1,
+    VALUES ('parques.ImportarTipoCambio', @vUrl, 1,
             CASE WHEN @vExistia = 0 THEN 1 ELSE 0 END,
             CASE WHEN @vExistia = 1 THEN 1 ELSE 0 END, 0);
 END
 GO
 
 -- ============================================================
--- SP auxiliar: sp_ObtenerTipoCambioVigente
+-- SP auxiliar: ObtenerTipoCambioVigente
 -- Retorna el tipo de cambio mas reciente para un tipo dado.
 -- Uso: llamarlo desde otros SPs que necesiten convertir precios.
 -- ============================================================
-CREATE OR ALTER PROCEDURE parques.sp_ObtenerTipoCambioVigente
+CREATE OR ALTER PROCEDURE parques.ObtenerTipoCambioVigente
     @vTipo   VARCHAR(20) = 'oficial',
     @vVenta  DECIMAL(10,2) OUTPUT,
     @vCompra DECIMAL(10,2) OUTPUT
@@ -814,7 +814,7 @@ BEGIN
 
     IF @vVenta IS NULL
     BEGIN
-        RAISERROR('- No hay tipo de cambio registrado para el tipo indicado. Ejecute sp_ImportarTipoCambio primero.', 16, 1);
+        RAISERROR('- No hay tipo de cambio registrado para el tipo indicado. Ejecute ImportarTipoCambio primero.', 16, 1);
         RETURN;
     END
 END
@@ -823,24 +823,24 @@ GO
 -- ============================================================
 -- NOTA DE USO:
 -- Habilitar OLE Automation (una sola vez, requiere sysadmin):
---   EXEC sp_configure 'Ole Automation Procedures', 1;
+--   EXEC configure 'Ole Automation Procedures', 1;
 --   RECONFIGURE;
 --
 -- Importar tipo de cambio actual:
---   EXEC parques.sp_ImportarTipoCambio @vTipo = 'oficial';
---   EXEC parques.sp_ImportarTipoCambio @vTipo = 'blue';
---   EXEC parques.sp_ImportarTipoCambio @vTipo = 'tarjeta';
+--   EXEC parques.ImportarTipoCambio @vTipo = 'oficial';
+--   EXEC parques.ImportarTipoCambio @vTipo = 'blue';
+--   EXEC parques.ImportarTipoCambio @vTipo = 'tarjeta';
 --
 -- Consultar historial:
 --   SELECT * FROM parques.TipoCambio ORDER BY fecha DESC, tipo;
 --
 -- Usar en otro SP para convertir un precio en pesos a dolares:
 --   DECLARE @vVenta DECIMAL(10,2), @vCompra DECIMAL(10,2);
---   EXEC parques.sp_ObtenerTipoCambioVigente
+--   EXEC parques.ObtenerTipoCambioVigente
 --       @vTipo = 'oficial', @vVenta = @vVenta OUTPUT, @vCompra = @vCompra OUTPUT;
 --   SELECT @vPrecioARS / @vVenta AS precioUSD;
 -- ============================================================
-PRINT 'SPs parques.sp_ImportarTipoCambio y sp_ObtenerTipoCambioVigente creados correctamente.';
+PRINT 'SPs parques.ImportarTipoCambio y ObtenerTipoCambioVigente creados correctamente.';
 GO
 
 -- =============================================
@@ -869,9 +869,9 @@ USE ParquesNacionales;
 GO
 
 -- ============================================================
--- SP: sp_ImportarAreasWDPA
+-- SP: ImportarAreasWDPA
 -- ============================================================
-CREATE OR ALTER PROCEDURE parques.sp_ImportarAreasWDPA
+CREATE OR ALTER PROCEDURE parques.ImportarAreasWDPA
     @vRutaArchivo NVARCHAR(500)
 AS
 BEGIN
@@ -950,7 +950,7 @@ BEGIN
             TABLOCK
         );
     ';
-    EXEC sp_executesql @vSql;
+    EXEC executesql @vSql;
 
     SELECT @vTotalStaging = COUNT(*) FROM #AreasWDPA;
     PRINT 'Filas cargadas en staging temporal: ' + CAST(@vTotalStaging AS VARCHAR);
@@ -1086,14 +1086,14 @@ BEGIN
     PRINT '----------------------------------------------';
 
     INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-    VALUES ('parques.sp_ImportarAreasWDPA', @vRutaArchivo, @vTotalStaging,
+    VALUES ('parques.ImportarAreasWDPA', @vRutaArchivo, @vTotalStaging,
             @vInsertadas, @vActualizadas, 0);
 END
 GO
 
 -- ============================================================
 -- NOTA DE USO:
--- EXEC parques.sp_ImportarAreasWDPA
+-- EXEC parques.ImportarAreasWDPA
 --     @vRutaArchivo = 'C:\TP_ParquesNacionales\datasets\WDPA_WDOECM_Jun2026_Public_ARG_csv.csv';
 --
 -- Verificacion post-importacion:
@@ -1103,7 +1103,7 @@ GO
 --   JOIN parques.Ubicacion  u  ON u.idUbicacion   = p.idUbicacion
 --   ORDER BY tp.descripcion, p.nombre;
 -- ============================================================
-PRINT 'SP parques.sp_ImportarAreasWDPA creado correctamente.';
+PRINT 'SP parques.ImportarAreasWDPA creado correctamente.';
 GO
 
 -- =============================================
@@ -1132,9 +1132,9 @@ USE ParquesNacionales;
 GO
 
 -- ============================================================
--- SP: sp_ImportarAreasProtegidas
+-- SP: ImportarAreasProtegidas
 -- ============================================================
-CREATE OR ALTER PROCEDURE parques.sp_ImportarAreasProtegidas
+CREATE OR ALTER PROCEDURE parques.ImportarAreasProtegidas
     @vRutaArchivo NVARCHAR(500)
 AS
 BEGIN
@@ -1181,7 +1181,7 @@ BEGIN
             TABLOCK
         );
     ';
-    EXEC sp_executesql @vSql;
+    EXEC executesql @vSql;
 
     SELECT @vFilas = COUNT(*) FROM #AreasProtegidas;
     PRINT 'Filas cargadas en staging temporal: ' + CAST(@vFilas AS VARCHAR);
@@ -1335,14 +1335,14 @@ BEGIN
     PRINT 'Parques actualizados: '  + CAST(@vActualizadas  AS VARCHAR);
 
     INSERT INTO parques.LogImportacion (procedimiento, archivoFuente, totalLeido, insertados, actualizados, errores)
-    VALUES ('parques.sp_ImportarAreasProtegidas', @vRutaArchivo, @vFilas,
+    VALUES ('parques.ImportarAreasProtegidas', @vRutaArchivo, @vFilas,
             @vInsertadas, @vActualizadas, 0);
 END
 GO
 
 -- ============================================================
 -- NOTA DE USO:
--- EXEC parques.sp_ImportarAreasProtegidas
+-- EXEC parques.ImportarAreasProtegidas
 --     @vRutaArchivo = 'C:\TP_ParquesNacionales\datasets\aprn_h_ubicacion_superycatint_ha.csv';
 --
 -- Verificacion:
@@ -1352,5 +1352,5 @@ GO
 --   JOIN parques.Ubicacion  u  ON u.idUbicacion   = p.idUbicacion
 --   ORDER BY tp.descripcion, p.nombre;
 -- ============================================================
-PRINT 'SP parques.sp_ImportarAreasProtegidas creado correctamente.';
+PRINT 'SP parques.ImportarAreasProtegidas creado correctamente.';
 GO

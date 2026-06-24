@@ -422,7 +422,7 @@ USE ParquesNacionales;
 GO
 
 -- ============================================================
--- TESTING: sp_TipoConsesion_Insertar / Eliminar / Actualizar
+-- TESTING: TipoConsesion_Insertar / Eliminar / Actualizar
 -- ============================================================
 
 PRINT '===== TEST 1 (OK): alta de TipoDeConsesion =====';
@@ -463,7 +463,7 @@ BEGIN CATCH
 END CATCH
 
 -- ============================================================
--- TESTING: sp_Empresa_Insertar / Eliminar / Actualizar
+-- TESTING: Empresa_Insertar / Eliminar / Actualizar
 -- ============================================================
 
 PRINT '===== TEST 6 (OK): alta de Empresa =====';
@@ -513,7 +513,7 @@ EXEC concesiones.Empresa_Actualizar
 SELECT * FROM concesiones.Empresa WHERE idEmpresa = 1;
 
 -- ============================================================
--- TESTING: sp_Concesion_Insertar / Eliminar / Actualizar
+-- TESTING: Concesion_Insertar / Eliminar / Actualizar
 -- (Requiere idParque valido de parques.Parque)
 -- ============================================================
 
@@ -610,7 +610,7 @@ EXEC concesiones.Concesion_Eliminar @idConcesion = @vIdTemp;
 SELECT * FROM concesiones.Concesion;
 
 -- ============================================================
--- TESTING: sp_PagoConcesion_Insertar / Eliminar / Actualizar
+-- TESTING: PagoConcesion_Insertar / Eliminar / Actualizar
 -- ============================================================
 
 PRINT '===== TEST 16 (OK): alta de pagos de canon =====';
@@ -742,7 +742,7 @@ EXEC concesiones.Empresa_Insertar
     @email       = 'info@aventurapatag.com';
 
 -- ============================================================
--- TESTING: sp_AltaConcesionCompleta
+-- TESTING: AltaConcesionCompleta
 -- ============================================================
 
 PRINT '===== TEST 1 (OK): alta de concesion valida sin solapamiento =====';
@@ -843,7 +843,7 @@ EXEC concesiones.AltaConcesionCompleta
 SELECT * FROM concesiones.Concesion;
 
 -- ============================================================
--- TESTING: sp_RegistrarPagoCanon
+-- TESTING: RegistrarPagoCanon
 -- ============================================================
 
 PRINT '===== TEST 7 (OK): primer pago de canon =====';
