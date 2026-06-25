@@ -19,6 +19,15 @@ USE ParquesNacionales;
 GO
 
 -- ============================================================
+-- CONFIGURACION: Habilitar acceso a las APIs externas
+-- ============================================================
+EXEC sp_configure 'show advanced options', 1;
+RECONFIGURE;
+EXEC sp_configure 'Ole Automation Procedures', 1;
+RECONFIGURE;
+GO
+
+-- ============================================================
 -- CONFIGURACION: ajustar esta ruta a la ubicacion local de los datasets
 -- ============================================================
 DECLARE @vBasePath NVARCHAR(500) =
@@ -46,6 +55,7 @@ PRINT '-- Caso exitoso: primera importacion del CSV';
 -- RESULTADO ESPERADO: Filas insertadas ~660 (una por periodo/tipo)
 EXEC parques.ImportarVisitasNacionales
     @vRutaArchivo = 'C:\TP_ParquesNacionales\Entrega6_Importacion\datasets\datos-gob-ar\visitas-residentes-y-no-residentes.csv';
+WAITFOR DELAY '00:00:01';
 
 -- Evidencia: muestra primeras y ultimas filas importadas
 SELECT TOP 5
@@ -79,6 +89,7 @@ DECLARE @vConteoAntes INT = (SELECT COUNT(*) FROM parques.EstadisticaVisitas);
 
 EXEC parques.ImportarVisitasNacionales
     @vRutaArchivo = 'C:\TP_ParquesNacionales\Entrega6_Importacion\datasets\datos-gob-ar\visitas-residentes-y-no-residentes.csv';
+WAITFOR DELAY '00:00:01';
 
 DECLARE @vConteoDespues INT = (SELECT COUNT(*) FROM parques.EstadisticaVisitas);
 
@@ -95,6 +106,8 @@ PRINT '-- Fallo esperado: archivo no encontrado';
 BEGIN TRY
     EXEC parques.ImportarVisitasNacionales
         @vRutaArchivo = 'C:\ruta\inexistente\archivo.csv';
+
+        WAITFOR DELAY '00:00:01';
 END TRY
 BEGIN CATCH
     PRINT 'ERROR capturado (esperado): ' + ERROR_MESSAGE();
@@ -115,6 +128,7 @@ PRINT '-- Caso exitoso: importacion CSV por region';
 -- RESULTADO ESPERADO: ~3960 registros, 6 regiones distintas
 EXEC parques.ImportarVisitasPorRegion
     @vRutaArchivo = 'C:\TP_ParquesNacionales\Entrega6_Importacion\datasets\datos-gob-ar\visitas-residentes-y-no-residentes-por-region.csv';
+WAITFOR DELAY '00:00:01';
 
 -- Evidencia: resumen por region
 SELECT
@@ -134,6 +148,7 @@ PRINT '-- Caso Upsert: reimportacion (no debe duplicar)';
 DECLARE @vConteoAntes2 INT = (SELECT COUNT(*) FROM parques.EstadisticaVisitasPorRegion);
 EXEC parques.ImportarVisitasPorRegion
     @vRutaArchivo = 'C:\TP_ParquesNacionales\Entrega6_Importacion\datasets\datos-gob-ar\visitas-residentes-y-no-residentes-por-region.csv';
+WAITFOR DELAY '00:00:01';
 DECLARE @vConteoDespues2 INT = (SELECT COUNT(*) FROM parques.EstadisticaVisitasPorRegion);
 IF @vConteoAntes2 = @vConteoDespues2
     PRINT 'UPSERT OK: sin duplicados. Registros: ' + CAST(@vConteoDespues2 AS VARCHAR);
@@ -155,6 +170,7 @@ PRINT '-- Caso exitoso: importacion CSV porcentajes anuales';
 -- RESULTADO ESPERADO: 18 filas, anios 2008 a 2025
 EXEC parques.ImportarVisitasAnual
     @vRutaArchivo = 'C:\TP_ParquesNacionales\Entrega6_Importacion\datasets\datos-gob-ar\aprn_i_visitas_porc_2024.csv';
+WAITFOR DELAY '00:00:01';
 
 -- Evidencia
 SELECT
@@ -196,6 +212,7 @@ PRINT '-- Caso exitoso: importacion CSV APN (separador ;)';
 -- RESULTADO ESPERADO: tipos de parque creados, parques insertados con superficie en ha
 EXEC parques.ImportarAreasProtegidas
     @vRutaArchivo = 'C:\TP_ParquesNacionales\Entrega6_Importacion\datasets\datos-gob-ar\aprn_h_ubicacion_superycatint_ha.csv';
+WAITFOR DELAY '00:00:01';
 
 -- Evidencia: tipos de parque generados
 SELECT idTipoParque, descripcion
@@ -219,6 +236,8 @@ PRINT '-- Caso Upsert: reimportacion APN (no debe duplicar)';
 DECLARE @vConteoAntes4 INT = (SELECT COUNT(*) FROM parques.Parque);
 EXEC parques.ImportarAreasProtegidas
     @vRutaArchivo = 'C:\TP_ParquesNacionales\Entrega6_Importacion\datasets\datos-gob-ar\aprn_h_ubicacion_superycatint_ha.csv';
+WAITFOR DELAY '00:00:01';
+
 DECLARE @vConteoDespues4 INT = (SELECT COUNT(*) FROM parques.Parque);
 IF @vConteoAntes4 = @vConteoDespues4
     PRINT 'UPSERT OK: sin duplicados. Parques en sistema: ' + CAST(@vConteoDespues4 AS VARCHAR);
@@ -242,14 +261,15 @@ PRINT '-- Caso exitoso: importacion CSV WDPA Protected Planet';
 -- Nuevas areas protegidas no nacionales seran descartadas e informadas
 EXEC parques.ImportarAreasWDPA
     @vRutaArchivo = 'C:\TP_ParquesNacionales\Entrega6_Importacion\datasets\protected-planet\WDPA_WDOECM_Jun2026_Public_ARG_csv\WDPA_WDOECM_Jun2026_Public_ARG_csv.csv';
+WAITFOR DELAY '00:00:01';
 
 -- Evidencia: distribucion por tipo de area en staging (todas las jurisdicciones)
-SELECT
-    LTRIM(RTRIM(desigType)) AS jurisdiccion,
-    COUNT(*)                AS cantidad
-FROM staging.AreasWDPA
-GROUP BY LTRIM(RTRIM(desigType))
-ORDER BY cantidad DESC;
+--SELECT
+    --LTRIM(RTRIM(desigType)) AS jurisdiccion,
+    --COUNT(*)                AS cantidad
+--FROM #AreasWDPA
+--GROUP BY LTRIM(RTRIM(desigType))
+--ORDER BY cantidad DESC;
 
 -- Evidencia: parques con superficie actualizada por WDPA
 SELECT TOP 10
@@ -280,6 +300,8 @@ PRINT '-- Caso Upsert: reimportacion WDPA (no debe duplicar parques)';
 DECLARE @vConteoAntes5 INT = (SELECT COUNT(*) FROM parques.Parque);
 EXEC parques.ImportarAreasWDPA
     @vRutaArchivo = 'C:\TP_ParquesNacionales\Entrega6_Importacion\datasets\protected-planet\WDPA_WDOECM_Jun2026_Public_ARG_csv\WDPA_WDOECM_Jun2026_Public_ARG_csv.csv';
+WAITFOR DELAY '00:00:01';
+
 DECLARE @vConteoDespues5 INT = (SELECT COUNT(*) FROM parques.Parque);
 IF @vConteoAntes5 = @vConteoDespues5
     PRINT 'UPSERT OK: sin duplicados.';
