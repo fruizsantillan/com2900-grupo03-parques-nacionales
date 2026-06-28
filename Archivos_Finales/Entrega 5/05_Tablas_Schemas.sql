@@ -11,14 +11,6 @@
 -- Orden de ejecucion: 1ro este script, luego ABM, luego Negocio.
 -- =============================================
 
--- =============================================
--- Universidad Nacional de La Matanza
--- Materia: 3641 - Bases de Datos Aplicada
--- Grupo: 03
--- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
--- Fecha: 15/06/2026
--- Descripcion: Script unificado Entrega 5 - DB, schemas, tablas, ABM, negocio.
--- =============================================
 
 -- ============================================================
 -- 01 - BASE DE DATOS Y SCHEMAS
