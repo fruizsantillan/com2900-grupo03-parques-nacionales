@@ -30,7 +30,7 @@ import pyodbc
 # Ajustar SERVER al nombre de la instancia local.
 # Ejemplos comunes: 'localhost', '.\\SQLEXPRESS', '(local)'
 # -------------------------------------------------
-SERVER   = 'localhost'
+SERVER   = 'localhost' #aca hay que poner .\SQLEXPRESS muy probablemente
 DATABASE = 'ParquesNacionales'
 # Se intentan varios drivers por compatibilidad
 DRIVERS  = [
