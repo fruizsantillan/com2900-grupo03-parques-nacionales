@@ -15,23 +15,6 @@
 -- Prerequisito: Ejecutar 01_tablas_y_schemas.sql.
 -- =============================================
 
-USE ParquesNacionales;
-GO
-
-
--- =============================================
--- Universidad Nacional de La Matanza
--- Materia: 3641 - Bases de Datos Aplicada
--- Grupo: 03
--- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
--- Fecha: 15/06/2026
--- Descripcion: Stored Procedures de ABM para el modulo Parques.
---              SPs: TipoParque             (Insertar/Actualizar/Eliminar/ObtenerPorId)
---                   Ubicacion              (Insertar/Actualizar/Eliminar/ObtenerPorId)
---                   Parque                 (Insertar/Actualizar/Eliminar/ObtenerPorId)
---                   Guardaparque           (Insertar/Actualizar/Eliminar/ObtenerPorId)
---                   AsignacionGuardaparque (Insertar/Actualizar/Eliminar/ObtenerPorId)
--- =============================================
 
 USE ParquesNacionales;
 GO
