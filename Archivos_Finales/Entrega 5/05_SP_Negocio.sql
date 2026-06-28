@@ -17,25 +17,6 @@
 USE ParquesNacionales;
 GO
 
-
--- =============================================
--- Universidad Nacional de La Matanza
--- Materia: 3641 - Bases de Datos Aplicada
--- Grupo: 03
--- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
--- Fecha: 16/06/2026
--- Descripcion: Stored Procedures de LOGICA DE NEGOCIO del modulo Parques.
---              Operaciones que afectan varias tablas, encapsuladas en
---              transacciones que garantizan la integridad de los datos.
---              SPs: RegistrarParque             (Ubicacion + Parque)
---                   RegistrarGuardaparque       (Guardaparque + 1er Asignacion)
---                   ReasignarGuardaparque       (cierra asignacion + abre nueva)
---                   RegistrarEgresoGuardaparque (cierra asignacion vigente)
--- =============================================
-
-USE ParquesNacionales;
-GO
-
 -- ============================================================
 -- REGISTRAR PARQUE
 -- Da de alta la Ubicacion y el Parque en una sola transaccion,
