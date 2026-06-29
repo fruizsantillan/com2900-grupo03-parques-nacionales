@@ -451,6 +451,7 @@ GO
 -- ============================================================
 CREATE OR ALTER PROCEDURE parques.ImportarFeriados
     @vAnio INT
+WITH EXECUTE AS OWNER
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -556,6 +557,7 @@ USE ParquesNacionales;
 GO
 CREATE OR ALTER PROCEDURE parques.ImportarTipoCambio
     @vTipo VARCHAR(20) = 'oficial'
+WITH EXECUTE AS OWNER
 AS
 BEGIN
     SET NOCOUNT ON;
