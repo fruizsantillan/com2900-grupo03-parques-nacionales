@@ -24,7 +24,7 @@ GO
 -- =====================================================
 PRINT '--- TEST 2: Descifrado de DNI de Guia mediante SP ---';
 -- Resultado esperado: se muestra apyn, dniDescifrado (igual al dni original), especialidad, titulo
-EXEC personal.Guia_ObtenerDniDescifrado @dniBusqueda = 30111222;
+EXEC personal.Guia_ObtenerDniDescifrado @dniBusqueda = 30000001;
 GO
 
 -- =====================================================
@@ -33,7 +33,7 @@ GO
 PRINT '--- TEST 3: Descifrado de DNI de Guardaparque mediante SP ---';
 -- Resultado esperado: se muestra apyn, email, telefono, localidad, fechaNacimiento, dniDescifrado
 -- Ajustar el DNI de busqueda a uno existente en la tabla Guardaparque
-EXEC personal.Guardaparque_ObtenerDniDescifrado @dniBusqueda = 25333444;
+EXEC personal.Guardaparque_ObtenerDniDescifrado @dniBusqueda = 20000001;
 GO
 
 -- =====================================================
@@ -81,7 +81,7 @@ GO
 PRINT '--- TEST 7: rol_consultas accede al DNI solo mediante el SP autorizado ---';
 EXECUTE AS USER = 'usr_consultas_demo';
 BEGIN TRY
-    EXEC personal.Guia_ObtenerDniDescifrado @dniBusqueda = 30111222;
+    EXEC personal.Guia_ObtenerDniDescifrado @dniBusqueda = 30000001;
     PRINT 'EXITO: rol_consultas pudo descifrar via SP autorizado (SEGURIDAD OK)';
 END TRY
 BEGIN CATCH
