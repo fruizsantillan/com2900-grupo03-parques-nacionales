@@ -1369,8 +1369,7 @@ BEGIN
             EXEC ventas.PrecioEntrada_Insertar
                 @valor              = @vValorSeed,
                 @idParque           = @vIdParqueSeed,
-                @idTipoVisitante    = @vIdTVSeed,
-                @fechaHasta         = NULL;
+                @idTipoVisitante    = @vIdTVSeed;
         END TRY
         BEGIN CATCH
             PRINT 'Aviso precio parque ' + CAST(@vIdParqueSeed AS VARCHAR)
@@ -1689,8 +1688,7 @@ BEGIN
             EXEC ventas.PrecioEntrada_Insertar
                 @valor              = @vValorSeed,
                 @idParque           = @vIdParqueSeed,
-                @idTipoVisitante    = @vIdTVSeed,
-                @fechaHasta         = NULL;
+                @idTipoVisitante    = @vIdTVSeed;
         END TRY
         BEGIN CATCH
             PRINT 'Aviso precio parque ' + CAST(@vIdParqueSeed AS VARCHAR)
