@@ -620,7 +620,7 @@ GO
 -- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
 -- Fecha: 15/06/2026
 -- Descripcion: Importacion de feriados nacionales desde API REST (formato JSON).
---   Fuente: https://argentinadatos.com/v1/feriados/{anio}
+--   Fuente: https://api.argentinadatos.com/v1/feriados/{anio}
 --   Formato: JSON - segundo formato de datos del modulo de importacion
 --   Respuesta JSON (array): [{"fecha":"YYYY-MM-DD","tipo":"...","nombre":"..."}]
 --   Tipos conocidos: inamovible, trasladable, puente, nolaborable
@@ -664,7 +664,7 @@ BEGIN
     DECLARE @vInsertadas   INT = 0;
     DECLARE @vActualizadas INT = 0;
 
-    SET @vUrl = 'https://argentinadatos.com/v1/feriados/' + CAST(@vAnio AS VARCHAR(4));
+    SET @vUrl = 'https://api.argentinadatos.com/v1/feriados/' + CAST(@vAnio AS VARCHAR(4));
     PRINT 'Consultando: ' + @vUrl;
 
     -- --------------------------------------------------------
@@ -1369,8 +1369,7 @@ BEGIN
             EXEC ventas.PrecioEntrada_Insertar
                 @valor              = @vValorSeed,
                 @idParque           = @vIdParqueSeed,
-                @idTipoVisitante    = @vIdTVSeed,
-                @fechaHasta         = NULL;
+                @idTipoVisitante    = @vIdTVSeed;
         END TRY
         BEGIN CATCH
             PRINT 'Aviso precio parque ' + CAST(@vIdParqueSeed AS VARCHAR)
@@ -1689,8 +1688,7 @@ BEGIN
             EXEC ventas.PrecioEntrada_Insertar
                 @valor              = @vValorSeed,
                 @idParque           = @vIdParqueSeed,
-                @idTipoVisitante    = @vIdTVSeed,
-                @fechaHasta         = NULL;
+                @idTipoVisitante    = @vIdTVSeed;
         END TRY
         BEGIN CATCH
             PRINT 'Aviso precio parque ' + CAST(@vIdParqueSeed AS VARCHAR)

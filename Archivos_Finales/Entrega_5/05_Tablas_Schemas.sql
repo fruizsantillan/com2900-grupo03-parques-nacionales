@@ -496,3 +496,26 @@ BEGIN
     );
 END
 GO
+
+-- ============================================================
+-- LOG DE IMPORTACION
+-- Registra cada ejecucion de un SP de importacion:
+--   fecha/hora, procedimiento, archivo fuente y contadores.
+-- ============================================================
+IF NOT EXISTS (SELECT 1 FROM sys.tables t
+               JOIN sys.schemas s ON t.schema_id = s.schema_id
+               WHERE t.name = 'LogImportacion' AND s.name = 'parques')
+BEGIN
+    CREATE TABLE parques.LogImportacion (
+        idLog          INT           IDENTITY(1,1)  NOT NULL,
+        fechaHora      DATETIME                     NOT NULL DEFAULT GETDATE(),
+        procedimiento  VARCHAR(200)                 NOT NULL,
+        archivoFuente  VARCHAR(500)                 NULL,
+        totalLeido     INT                          NOT NULL DEFAULT 0,
+        insertados     INT                          NOT NULL DEFAULT 0,
+        actualizados   INT                          NOT NULL DEFAULT 0,
+        errores        INT                          NOT NULL DEFAULT 0,
+        CONSTRAINT PK_LogImportacion PRIMARY KEY (idLog)
+    );
+END
+GO

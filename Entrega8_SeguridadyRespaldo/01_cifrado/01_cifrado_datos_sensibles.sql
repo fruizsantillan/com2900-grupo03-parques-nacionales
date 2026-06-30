@@ -295,7 +295,7 @@ BEGIN
         SELECT razonSocial, contacto, email, telefono,
                CONVERT(VARCHAR(20), DECRYPTBYKEY(cuitCifrado)) AS cuitDescifrado
         FROM concesiones.Empresa
-        WHERE cuit = @cuitBusqueda;
+        WHERE CONVERT(VARCHAR(20), DECRYPTBYKEY(cuitCifrado)) = @cuitBusqueda;
 
         CLOSE SYMMETRIC KEY ClaveSimetricaDatosSensibles;
     END TRY
