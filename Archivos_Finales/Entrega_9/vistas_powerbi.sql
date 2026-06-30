@@ -49,4 +49,6 @@ INNER JOIN ventas.TipoVisitante tvis ON tvis.idTipoVisitante = pe.idTipoVisitant
 WHERE lv.idPrecioEntrada IS NOT NULL;
 GO
 
--- Esta vista es lo mismo que el reporte de visitas por periodo pero power bi trabaja con vistas.
+-- Esta vista es lo mismo que el reporte de visitas por periodo pero power bi trabaja con vistas. El reporte AGRUPA esta vista no agrupa porque el encargado de la agrupacion es PBI
+
+SELECT * FROM ventas.vw_VisitasPorParque
