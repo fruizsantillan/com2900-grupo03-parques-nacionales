@@ -101,8 +101,3 @@ GO
 GRANT VIEW DEFINITION ON SYMMETRIC KEY::ClaveSimetricaDatosSensibles TO rol_consultas;
 GRANT CONTROL ON CERTIFICATE::CertDatosSensibles TO rol_consultas;
 GO
-
--- Esto permite que el certificado pueda ser usado por el rol para abrir la llave
-ADD SIGNATURE TO CERTIFICATE CertDatosSensibles BY CERTIFICATE CertDatosSensibles;
-GRANT AUTHENTICATE ON CERTIFICATE::CertDatosSensibles TO rol_consultas;
-GO
