@@ -4,15 +4,14 @@
 -- Grupo: 03
 -- Integrantes: Ruiz Santillan, Facundo - Lago, Franco Nehuen - Del Vecchio, Fabrizio - Ocampos, Horacio.
 -- Fecha: 15/06/2026
--- Descripcion: Scripts de testing para el modulo de importacion (Entrega 6).
---              Prueba todos los SPs de importacion (CSV y API):
---              - Casos exitosos con evidencia (SELECT post-importacion)
---              - Casos de error con validaciones esperadas
---              - Verificacion Upsert: reimportacion sin duplicados
---              - Verificacion importacion parcial: filas invalidas descartadas
--- Prerequisito: Ejecutar 01_tablas_staging.sql, todos los scripts de 02_importacion/
---               y 03_datos_iniciales/ antes de ejecutar este archivo.
--- IMPORTANTE: Ajustar la variable @vBasePath con la ruta local a los datasets.
+-- Descripcion: Importacion de areas protegidas desde la base de datos mundial WDPA.
+--              Fuente: WDPA_WDOECM_Jun2026_Public_ARG_csv.csv (Protected Planet / UNEP-WCMC)
+--              Formato: CSV UTF-8, separador coma, 34 columnas.
+--              Columnas usadas: NAME, DESIG, DESIG_TYPE, GIS_AREA.
+--              GIS_AREA en km2 -> se convierte a hectareas (* 100).
+--              Filtra: solo DESIG_TYPE = 'National'.
+--              Estrategia: BULK INSERT -> tabla temporal #AreasWDPA -> cursor UPSERT.
+-- Prerequisito: Ejecutar entrega6_unificado.sql (tablas y SPs de E5 y E6).
 -- =============================================
 
 CREATE OR ALTER PROCEDURE parques.ImportarAreasWDPA
