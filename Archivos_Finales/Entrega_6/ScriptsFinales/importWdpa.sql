@@ -330,7 +330,7 @@ GO
 -- ============================================================
 
 PRINT '';
-PRINT '=== TEST 5: ImportarAreasWDPA ===';
+PRINT '=== TEST: ImportarAreasWDPA ===';
 -- [EXITOSO]
 PRINT '-- Caso exitoso: importacion CSV WDPA Protected Planet';
 EXEC parques.ImportarAreasWDPA
